@@ -111,7 +111,7 @@ header h1{font-size:16px;margin:0;white-space:nowrap}
 .edcol{display:flex;flex-direction:column;min-height:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
 .edtop{padding:12px 14px 10px;border-bottom:1px solid var(--line)}
 .edtop .hint{margin:4px 0 8px;font-size:12px}
-.elgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.elgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
 .elgrid button{padding:2px;font-size:13px;min-height:40px;flex-direction:column;gap:0;line-height:1.1}
 .elgrid button small{font-size:10px;color:var(--muted);font-weight:400}
 .elgrid button.on{background:var(--gold);border-color:var(--gold);color:#fff;font-weight:700}
@@ -239,7 +239,7 @@ input[type=range]{width:100%;accent-color:var(--gold);height:32px;margin:0}
     <div class="keys">
       <span><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> 文字を動かす</span>
       <span><kbd>[</kbd><kbd>]</kbd> 前後の賞状</span>
-      <span><kbd>1</kbd>〜<kbd>7</kbd> 文字を選ぶ</span>
+      <span><kbd>1</kbd>〜<kbd>9</kbd><kbd>0</kbd> 文字を選ぶ</span>
       <span><kbd>⌘</kbd><kbd>Z</kbd> 元に戻す</span>
     </div>
     <div class="thumbs" id="thumbs"></div>
@@ -267,7 +267,7 @@ input[type=range]{width:100%;accent-color:var(--gold);height:32px;margin:0}
         <div class="frow"><span class="lb">色</span>
           <div class="swatches" id="swatches">
             <button data-c="#000000" style="background:#000" title="黒"></button>
-            <button data-c="#b4473a" style="background:#b4473a" title="赤"></button>
+            <button data-c="#c8322d" style="background:#c8322d" title="朱色（印鑑）"></button>
             <button data-c="#1f3a6b" style="background:#1f3a6b" title="紺"></button>
             <button data-c="#7d612a" style="background:#7d612a" title="金茶"></button>
             <input type="color" id="eColor" title="ほかの色">
@@ -309,7 +309,7 @@ input[type=range]{width:100%;accent-color:var(--gold);height:32px;margin:0}
         <div class="shortcuts">
           <span><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd></span><span>選んだ文字を動かす（<kbd>shift</kbd>で5倍）</span>
           <span><kbd>[</kbd> <kbd>]</kbd></span><span>前の賞状・次の賞状</span>
-          <span><kbd>1</kbd>〜<kbd>7</kbd></span><span>編集する文字を選ぶ（賞状・順位・名前…）</span>
+          <span><kbd>1</kbd>〜<kbd>9</kbd> <kbd>0</kbd></span><span>編集する文字を選ぶ（賞状・順位・名前…園長名・印鑑）</span>
           <span><kbd>+</kbd> <kbd>-</kbd></span><span>文字を大きく・小さく</span>
           <span><kbd>⌘</kbd><kbd>Z</kbd></span><span>元に戻す（<kbd>⌘</kbd><kbd>shift</kbd><kbd>Z</kbd>でやり直す）</span>
           <span><kbd>esc</kbd></span><span>入力欄から抜ける（キー操作に戻る）</span>
@@ -801,15 +801,18 @@ const FONTS = [
 ];
 const F0 = FONTS[0][1];
 
-// 見本（Pages）から実測したレイアウト
+// 見本（Pages）と園長名入りの印刷見本（写真）から実測したレイアウト
 const DEFAULT_TEMPLATE = {
   title:   { label: '賞状',   text: '賞状', font: F0, size: 56, weight: 600, color: '#000000', spacing: 0, lineGap: 20, anchor: 'top', x: 252.2, y: 82.3, visible: true },
   rank:    { label: '順位',   text: '第　{順位}　位', font: F0, size: 28, weight: 500, color: '#000000', spacing: 0, lineGap: 20, anchor: 'top', x: 228.2, y: 54.6, visible: true },
   name:    { label: '名前',   text: '{名前}', font: F0, size: 32, weight: 500, color: '#000000', spacing: 0, lineGap: 20, anchor: 'bottom', x: 203.3, y: 174.2, visible: true },
-  body:    { label: '本文',   text: 'あなたはマラソン大会で\n最後までよく頑張りまし\nたので賞をおくります', font: F0, size: 33.5, weight: 500, color: '#000000', spacing: 0, lineGap: 24.7, anchor: 'top', x: 157.5, y: 44.4, visible: true },
-  date:    { label: '日付',   text: '{日付}', font: F0, size: 18, weight: 500, color: '#000000', spacing: 0, lineGap: 10, anchor: 'top', x: 72.2, y: 51.0, visible: true },
-  school1: { label: '法人名', text: '学校法人明青学園', font: F0, size: 18, weight: 500, color: '#000000', spacing: 0, lineGap: 10, anchor: 'top', x: 53.8, y: 51.0, visible: true },
-  school2: { label: '園名',   text: '明青幼稚園', font: F0, size: 26, weight: 600, color: '#000000', spacing: 0, lineGap: 10, anchor: 'top', x: 53.8, y: 108.0, visible: true },
+  body:    { label: '本文',   text: 'あなたはマラソン大会で\n最後までよく頑張りまし\nたので賞をおくります', font: F0, size: 33.5, weight: 500, color: '#000000', spacing: 0, lineGap: 23.3, anchor: 'top', x: 172.2, y: 44.4, visible: true },
+  date:    { label: '日付',   text: '{日付}', font: F0, size: 18, weight: 500, color: '#000000', spacing: 0, lineGap: 10, anchor: 'top', x: 94.2, y: 51.0, visible: true },
+  school1: { label: '法人名', text: '学校法人明青学園', font: F0, size: 18, weight: 500, color: '#000000', spacing: 0, lineGap: 10, anchor: 'top', x: 79.2, y: 51.0, visible: true },
+  school2: { label: '園名',   text: '明青幼稚園', font: F0, size: 26, weight: 600, color: '#000000', spacing: 0, lineGap: 10, anchor: 'top', x: 79.2, y: 108.0, visible: true },
+  head:    { label: '園長',   text: '園長', font: F0, size: 24, weight: 500, color: '#000000', spacing: 0, lineGap: 10, anchor: 'top', x: 58.1, y: 63.5, visible: true },
+  head2:   { label: '園長名', text: '西村　誠之輔', font: F0, size: 30, weight: 600, color: '#000000', spacing: 0.15, lineGap: 10, anchor: 'top', x: 58.1, y: 88.0, visible: true },
+  seal:    { label: '印鑑',   type: 'seal', text: '明青幼稚園', font: F0, size: 48, weight: 700, color: '#c8322d', spacing: 0, lineGap: 10, anchor: 'top', x: 58.1, y: 162.0, visible: true },
 };
 const KEYS = Object.keys(DEFAULT_TEMPLATE);
 const SAMPLE = { id: 0, name: 'めいせい たろう', rank: 1, include: true };
@@ -830,7 +833,8 @@ const state = {
 };
 let nextId = 1;
 
-const STORE_KEY = 'marathon-cert-v1';
+const STORE_KEY = 'marathon-cert-v2';
+const OLD_STORE_KEY = 'marathon-cert-v1';
 function saveSettings() {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify({
@@ -841,7 +845,12 @@ function saveSettings() {
 }
 function loadSettings() {
   try {
-    const s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+    let s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+    if (!s) {
+      // 旧版の設定：レイアウトは新しい見本に合わせ直し、日付などだけ引き継ぐ
+      s = JSON.parse(localStorage.getItem(OLD_STORE_KEY) || 'null');
+      if (s) delete s.template;
+    }
     if (!s) return;
     if (s.template) for (const k of KEYS) state.template[k] = Object.assign(clone(DEFAULT_TEMPLATE[k]), s.template[k] || {});
     for (const k of ['dateStr', 'dateFmt', 'rankFmt', 'order', 'dpi']) if (s[k] != null) state[k] = s[k];
@@ -972,6 +981,59 @@ function drawElement(ctx, k, el, stu) {
   return bb;
 }
 
+// 角印を描き、bbox(mm) を返す。el.size は一辺の長さ(pt)。
+// 文字は右の列から縦に並べ、各マスいっぱいに縦長に引き伸ばす（5文字なら 右列3字・左列2字）
+function drawSeal(ctx, k, el) {
+  const chars = [...el.text.replace(/[\s　]/g, '')];
+  const side = el.size * PT;
+  let top = el.y;
+  if (el.anchor === 'bottom') top = el.y - side;
+  else if (el.anchor === 'center') top = el.y - side / 2;
+  const left = el.x - side / 2;
+  ctx.save();
+  ctx.scale(k, k);
+  ctx.globalCompositeOperation = 'multiply';   // 朱肉のように下の文字と重なる
+  ctx.globalAlpha = 0.92;
+  ctx.fillStyle = ctx.strokeStyle = el.color;
+  const lw = side * 0.07;
+  const r = side * 0.05;
+  ctx.lineWidth = lw;
+  ctx.beginPath();
+  const a = left + lw / 2, b = top + lw / 2, s = side - lw;
+  ctx.moveTo(a + r, b);
+  ctx.arcTo(a + s, b, a + s, b + s, r); ctx.arcTo(a + s, b + s, a, b + s, r);
+  ctx.arcTo(a, b + s, a, b, r); ctx.arcTo(a, b, a + s, b, r);
+  ctx.closePath();
+  ctx.stroke();
+  const n = chars.length;
+  if (n) {
+    const cols = n <= 3 ? 1 : n <= 8 ? 2 : 3;
+    const counts = [];
+    for (let c = 0; c < cols; c++) counts.push(Math.floor(n / cols) + (c < n % cols ? 1 : 0));
+    const pad = side * 0.045;
+    const inner = side - lw * 2 - pad * 2;
+    const colW = inner / cols;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = fontStr(el, colW);
+    let i = 0;
+    counts.forEach((rows, c) => {
+      const cx = left + side - lw - pad - colW * (c + 0.5);
+      const cellH = inner / rows;
+      for (let rr = 0; rr < rows; rr++, i++) {
+        const cy = top + lw + pad + cellH * (rr + 0.5);
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(0.96, cellH * 0.96 / colW);
+        ctx.fillText(chars[i], 0, 0);
+        ctx.restore();
+      }
+    });
+  }
+  ctx.restore();
+  return { x0: left, x1: left + side, y0: top, y1: top + side };
+}
+
 const frameImg = new Image();
 frameImg.src = window.FRAME_SRC;
 
@@ -992,7 +1054,7 @@ function drawCert(ctx, k, stu, textOnly = false) {
   for (const key of KEYS) {
     const el = elFor(stu, key);
     if (!el.visible) continue;
-    boxes[key] = drawElement(ctx, k, el, stu);
+    boxes[key] = el.type === 'seal' ? drawSeal(ctx, k, el) : drawElement(ctx, k, el, stu);
   }
   ctx.restore();
   return boxes;
@@ -1231,6 +1293,8 @@ const HINTS = {
   rank: '{順位} の所に順位が入ります。',
   date: '{日付} の所に①で選んだ日付が入ります。',
   body: '改行した所で次の行（左の列）に移ります。',
+  head2: '園長が替わったときはここを書き換えてください。',
+  seal: '印鑑の文字です。5〜6文字だと右の列・左の列に分かれてきれいに収まります。大きさは一辺の長さ（48pt＝約17mm）です。',
 };
 
 let segWeightSet, segAnchorSet;
@@ -1239,9 +1303,9 @@ function buildEditor() {
   const eb = $('elbtns');
   KEYS.forEach((k, i) => {
     const b = document.createElement('button');
-    b.innerHTML = `${DEFAULT_TEMPLATE[k].label}<small>${i + 1}</small>`;
+    b.innerHTML = `${DEFAULT_TEMPLATE[k].label}<small>${(i + 1) % 10}</small>`;
     b.dataset.k = k;
-    b.title = `キー ${i + 1}`;
+    b.title = `キー ${(i + 1) % 10}`;
     b.addEventListener('click', () => selectEl(k));
     eb.appendChild(b);
   });
@@ -1272,7 +1336,10 @@ function syncEditor() {
   segAnchorSet(el.anchor);
   $('eColor').value = el.color;
   [...$('swatches').querySelectorAll('button')].forEach(b => b.classList.toggle('on', b.dataset.c === el.color));
-  $('lineGapCtl').style.display = el.text.includes('\n') ? '' : 'none';
+  const isSeal = el.type === 'seal';
+  $('lineGapCtl').style.display = !isSeal && el.text.includes('\n') ? '' : 'none';
+  document.querySelector('.ctl[data-ctl=spacing]').style.display = isSeal ? 'none' : '';
+  document.querySelector('.ctl[data-ctl=size] .lb').innerHTML = isSeal ? '大きさ<br><small>（一辺 pt）</small>' : '大きさ<br><small>（pt）</small>';
   $('eVisible').checked = !!el.visible;
 }
 
@@ -1363,7 +1430,7 @@ function onKey(e) {
   }
   if (e.key === '[' || e.key === 'PageUp' || e.key === '「') { e.preventDefault(); goTo(state.cur - 1); return; }
   if (e.key === ']' || e.key === 'PageDown' || e.key === '」') { e.preventDefault(); goTo(state.cur + 1); return; }
-  if (/^[1-7]$/.test(e.key)) { e.preventDefault(); selectEl(KEYS[Number(e.key) - 1]); return; }
+  if (/^[0-9]$/.test(e.key)) { const i = (Number(e.key) + 9) % 10; if (KEYS[i]) { e.preventDefault(); selectEl(KEYS[i]); } return; }
   if (e.key === '+' || e.key === '=' || e.key === ';') { e.preventDefault(); applyCtl('size', elFor(current(), state.sel).size + 1); return; }
   if (e.key === '-' || e.key === '_') { e.preventDefault(); applyCtl('size', elFor(current(), state.sel).size - 1); return; }
 }
