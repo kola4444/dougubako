@@ -1,0 +1,39 @@
+# Render の設定ファイル（Blueprint）
+# GitHub のリポジトリにこのファイルを置き、Render の「New → Blueprint」でリポジトリを選ぶと、
+# 下の内容どおりにサイトが作られます。
+#
+# ・どうぐばこ本体と各アプリを「静的サイト」として公開する（ビルド作業はなし）
+# ・アプリごとの通信先の制限（Content-Security-Policy）は、各HTMLの中に書いてある
+# ・ここでは、全ページ共通の安全のための設定だけを加える
+services:
+  - type: web
+    runtime: static
+    name: dougubako
+    buildCommand: echo "ビルドは不要です"
+    staticPublishPath: .
+    pullRequestPreviewsEnabled: false
+    headers:
+      # 他のサイトの中に埋め込まれて表示されないようにする（なりすまし画面の防止）
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
+      # ファイルの種類を勝手に判断させない
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      # 他のサイトへ移るとき、どのページから来たかを詳しく伝えない
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      # カメラ・マイク・位置情報などは使わない
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+      # 必ず暗号化された通信（https）で開かせる
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=31536000
+      # 試作のあいだは、検索エンジン（Googleなど）に載せない
+      - path: /*
+        name: X-Robots-Tag
+        value: noindex

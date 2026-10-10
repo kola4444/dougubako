@@ -2,6 +2,8 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
+<!-- 安全のための決まり：通信できるのは、地図（国土地理院）・道順（OSRM）・住所検索（国土地理院・OpenStreetMap）だけ -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' data:; img-src 'self' data: blob: https://cyberjapandata.gsi.go.jp https://cdnjs.cloudflare.com; connect-src 'self' https://router.project-osrm.org https://nominatim.openstreetmap.org https://msearch.gsi.go.jp; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -11,6 +13,8 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+<!-- どうぐばこ共通：利用許可証（どうぐばこと同じ場所に置いたときだけ読み込まれる） -->
+<script defer src="../common/license.js"></script>
 <style>
 :root{
   --bg:#f6f7f9; --panel:#fff; --ink:#1f2328; --muted:#6b7280; --line:#e3e6ea; --accent:#2563eb;
@@ -348,8 +352,7 @@ const BOX = {
   appId: 'busroute',
   ns: 'dougubako.busroute.',
   homeUrl: '../',
-  // 利用許可証の確認（見本：今は常にOK。将来は端末内の署名つき許可証を確かめる）
-  checkLicense() { return { ok: true }; },
+  // 利用許可証の確認は共通部品（common/license.js）が行う。端末の中の許可証を確かめるだけで、通信はしない
 };
 const KV = (() => {
   let dbp = null;
@@ -1660,12 +1663,10 @@ document.addEventListener('keydown', e => {
 $('#btnBox').href = BOX.homeUrl;
 
 /* 起動 */
-if (!BOX.checkLicense().ok) {
-  document.body.innerHTML = '<div style="padding:40px;font-size:16px">ご利用期間が終了しています。<br>どうぐばこにログインし直すか、園の管理者にお問い合わせください。</div>';
-} else {
-  render();
-  if (state.school) setTimeout(() => { map.invalidateSize(); fitAll(); }, 150);
-}
+render();
+if (state.school) setTimeout(() => { map.invalidateSize(); fitAll(); }, 150);
+// 許可証がなければ「どうぐばこを開いてください」を画面の上に出す（共通部品がないとき＝単体で使うときは確認しない）
+document.addEventListener('DOMContentLoaded', () => { if (window.DouguLicense) window.DouguLicense.guardApp(BOX.appId, BOX.homeUrl); });
 </script>
 </body>
 </html>
