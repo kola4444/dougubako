@@ -121,6 +121,7 @@ dialog::backdrop{background:rgba(0,0,0,.4)}
 .offbar{position:sticky;top:0;z-index:20;background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:6px 12px;font-size:.8rem;text-align:center;margin:0 auto 12px;max-width:980px}
 
 /* ---- 試作の体験メニュー ---- */
+#demoBtn[hidden]{display:none}
 #demoBtn{position:fixed;right:max(16px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom));z-index:40;background:var(--demo);color:#fff;border:0;border-radius:999px;padding:11px 16px;font-weight:700;font-size:.85rem;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.2)}
 .demo h3{color:var(--demo)}
 .demo p{margin:0;font-size:.8rem;color:var(--muted);line-height:1.6}
@@ -136,7 +137,7 @@ dialog::backdrop{background:rgba(0,0,0,.4)}
 <body>
 <div id="offbar" class="offbar" hidden>📴 ネットを切った状態を再現しています（体験メニューで戻せます）</div>
 <main id="screen"></main>
-<button id="demoBtn" type="button">🧪 試作の体験メニュー</button>
+<button id="demoBtn" type="button" hidden>🧪 試作の体験メニュー</button>
 <dialog id="dlg"></dialog>
 <div id="toast" role="status"></div>
 
@@ -168,6 +169,9 @@ const ERR = {
    ・期限切れ → 更新を試す（ネットがなければ案内）
    ============================================================ */
 async function boot() {
+  // ログインなしで使う設定（common/license.js の LOGIN_REQUIRED = false）のときは、すぐメニューを出す
+  $('#demoBtn').hidden = !L.loginRequired;
+  if (!L.loginRequired) return showMenu(L.profile);
   const st = await L.status();
   if (st.state === 'none' || st.state === 'bad') { if (st.state === 'bad') L.logout(); return showLogin(st.state === 'bad' ? '利用許可証を確認できなかったため、ログインし直してください。' : ''); }
   if (st.state === 'expired') {
@@ -306,12 +310,12 @@ const APPS = [
   { id: 'busroute', n: 'バスルート<br>計画', color: 'var(--c-jimu)', href: 'busroute/', net: true },
 ];
 function showMenu(pl) {
-  const near = daysLeft(pl) <= 7;
+  const near = L.loginRequired && daysLeft(pl) <= 7;
   show(`<div class="wrap">
     <div class="top">
       <img src="icon.svg" alt="">
       <div class="ttl"><h1>どうぐばこ</h1><p>${esc(pl.orgName)}</p></div>
-      <button class="chip ${near ? 'warn' : ''}" id="chip" type="button"><span class="dot"></span><span>${esc(pl.staff)}<small>${esc(L.PLANS[pl.plan].name)}プラン・あと${daysLeft(pl)}日有効</small></span></button>
+      ${L.loginRequired ? `<button class="chip ${near ? 'warn' : ''}" id="chip" type="button"><span class="dot"></span><span>${esc(pl.staff)}<small>${esc(L.PLANS[pl.plan].name)}プラン・あと${daysLeft(pl)}日有効</small></span></button>` : ''}
     </div>
     <section>
       <h2>使えるアプリ</h2>
@@ -328,7 +332,7 @@ function showMenu(pl) {
     </section>
     <div class="privacy">🔒 名簿・印鑑・コースなど、アプリで使うデータは<b>この端末（iPad・パソコン）の中だけ</b>に保存されます。どうぐばこのサーバーに送られることはありません。</div>
   </div>`);
-  $('#chip').onclick = () => accountDialog(pl);
+  $('#chip')?.addEventListener('click', () => accountDialog(pl));
   document.querySelectorAll('[data-soon]').forEach(b => b.onclick = () => toast(`「${b.dataset.soon}」は準備中です。できあがったら、ここから使えるようになります`, 3200));
   document.querySelectorAll('[data-lock]').forEach(b => b.onclick = () => {
     const plan = Object.values(L.PLANS).find(p => p.apps.includes(b.dataset.lock));

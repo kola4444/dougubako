@@ -414,7 +414,7 @@ function textOn(hex) {
 /* ============================================================
    データのひな形
    ・最初は空っぽ。初回の「初期設定」で園の位置・バスを登録する
-   ・「サンプルで試す」は架空の園のデータ（実在の園・停留所ではありません）
+   ・「サンプルで試す」は動きを試すためのデータ（園名は明青幼稚園。場所・停留所・コースは架空）
    ============================================================ */
 function S(name, orig, lat, lng) { return { id: uid(), name, lat, lng, pax: 0, via: false, orig }; }
 const ROUTE_COLORS = ['#f08c00', '#1c7ed6', '#e64980', '#2f9e44', '#7048e8', '#e03131', '#1098ad', '#5c940d'];
@@ -426,7 +426,7 @@ function defaultSettings() { return { factor: null, dwell: 1, buffer: 5, yearLab
 function blankState() { return { version: 1, name: '新しい案', school: null, settings: defaultSettings(), buses: [], routes: [], pool: [] }; }
 function sampleState() {
   const st = { version: 1, name: 'サンプル案', sample: true,
-    school: { name: 'みどりの森幼稚園（架空）', lat: 35.6690, lng: 139.4776 },
+    school: { name: '明青幼稚園', lat: 35.6690, lng: 139.4776 },
     settings: { ...defaultSettings(), city: '' },
     buses: [
       { id: 'b1', name: '大型バス（青）', capacity: 39, phone: '' },
@@ -1550,7 +1550,7 @@ function renderSetup() {
       if (!setup.name) { toast('園の名前を入れてください'); $('#suName').focus(); return; }
       setup.step = 2; renderSetup();
     };
-    $('#suSample').onclick = () => { if (setupMarker) { map.removeLayer(setupMarker); setupMarker = null; } finishSetup(sampleState()); toast('架空の園のサンプルを開きました。自由に動かして試してください', 6000); };
+    $('#suSample').onclick = () => { if (setupMarker) { map.removeLayer(setupMarker); setupMarker = null; } finishSetup(sampleState()); toast('サンプルを開きました（場所・停留所・コースは架空です）。自由に動かして試してください', 6000); };
   } else if (setup.step === 2) {
     el.innerHTML = `${steps}<h2>バスを登録してください</h2>
       <p>台数・定員はあとから⚙設定で変えられます。電話番号は印刷するルートマップに載ります（空欄でもかまいません）。</p>

@@ -19,6 +19,14 @@
     server: 'dougubako.demo.server',     // デモ用の仮サーバーの状態
     offline: 'dougubako.demo.offline',   // 「ネットを切った状態」の再現
   };
+  // ★ログインのオン・オフ★
+  //   false：ログインなしで、全部のアプリを使える（今はこちら。明青幼稚園での利用）
+  //   true ：どうぐばこを開くとログインが必要になり、利用許可証のしくみが動く
+  //   ログインを使うときは、ここを true に変えるだけでよい（画面・しくみはすべて残してある）
+  const LOGIN_REQUIRED = false;
+  // ログインなしのときに使う園の情報
+  const NO_LOGIN_PROFILE = { orgName: '明青幼稚園', staff: '', plan: 'standard' };
+
   const DAY = 86400000;
   const LIFETIME = 30 * DAY;             // 許可証の有効期間
   const RENEW_BEFORE = 7 * DAY;          // 期限の何日前から自動更新するか
@@ -56,7 +64,7 @@
     };
     const defaults = () => ({
       orgs: {
-        mori: { name: 'みどりの森幼稚園（架空）', plan: 'standard', active: true },
+        mori: { name: '明青幼稚園', plan: 'standard', active: true },
         hikari: { name: 'ひかり幼稚園（架空）', plan: 'light', active: true },
         aozora: { name: 'あおぞら幼稚園（架空）', plan: 'standard', active: false },
       },
@@ -148,6 +156,8 @@
   }
   const L = {
     PLANS, APP_NAMES, DAY,
+    loginRequired: LOGIN_REQUIRED,
+    profile: { ...NO_LOGIN_PROFILE, apps: [...PLANS[NO_LOGIN_PROFILE.plan].apps] },
     isOffline: () => ls.get(LS.offline) === '1',
     // 状態：none（未ログイン）/ bad（書き換えられている）/ expired（期限切れ）/ notInPlan（プラン外）/ ok
     async status(appId) {
@@ -192,6 +202,7 @@
     logout() { ls.del(LS.token); ls.del(LS.checked); },
     // アプリ側：許可証がなければ、画面の上に「どうぐばこを開いてください」を出す（アプリの中身は使えない）
     async guardApp(appId, homeUrl) {
+      if (!LOGIN_REQUIRED) return true;   // ログインなしで使う設定のときは確認しない
       const st = await L.status(appId);
       if (st.state === 'ok') return true;
       const plan = Object.values(PLANS).find(p => p.apps.includes(appId));
