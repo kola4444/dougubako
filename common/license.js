@@ -87,7 +87,7 @@
     }
     async function net() {
       await sleep(450 + Math.random() * 450);
-      if (ls.get(LS.offline) === '1') throw { code: 'offline' };
+      if (LOGIN_REQUIRED && ls.get(LS.offline) === '1') throw { code: 'offline' };
     }
     function fail(code) { throw { code }; }
     function checkAccount(email) {
@@ -158,7 +158,7 @@
     PLANS, APP_NAMES, DAY,
     loginRequired: LOGIN_REQUIRED,
     profile: { ...NO_LOGIN_PROFILE, apps: [...PLANS[NO_LOGIN_PROFILE.plan].apps] },
-    isOffline: () => ls.get(LS.offline) === '1',
+    isOffline: () => LOGIN_REQUIRED && ls.get(LS.offline) === '1',
     // 状態：none（未ログイン）/ bad（書き換えられている）/ expired（期限切れ）/ notInPlan（プラン外）/ ok
     async status(appId) {
       const raw = ls.get(LS.token); if (!raw) return { state: 'none' };

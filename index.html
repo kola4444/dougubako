@@ -152,7 +152,7 @@ const daysLeft = pl => Math.max(0, Math.ceil((pl.exp - Date.now()) / L.DAY));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let toastT;
 function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), ms); }
-function show(html) { $('#screen').innerHTML = html; $('#offbar').hidden = !L.isOffline(); window.scrollTo(0, 0); }
+function show(html) { $('#screen').innerHTML = html; $('#offbar').hidden = !(L.loginRequired && L.isOffline()); window.scrollTo(0, 0); }
 const ERR = {
   bad_login: 'メールアドレスかパスワードが違います。',
   ended: 'この園のご契約は終了しています。園の管理者にお問い合わせください。',
@@ -171,7 +171,11 @@ const ERR = {
 async function boot() {
   // ログインなしで使う設定（common/license.js の LOGIN_REQUIRED = false）のときは、すぐメニューを出す
   $('#demoBtn').hidden = !L.loginRequired;
-  if (!L.loginRequired) return showMenu(L.profile);
+  if (!L.loginRequired) {
+    // 体験メニューを出さないので、以前の「ネットを切った状態の再現」が残っていたら解除する
+    try { L.demo && L.demo.setOffline(false); } catch (e) { }
+    return showMenu(L.profile || { orgName: '明青幼稚園', staff: '', plan: 'standard', apps: ['marathon', 'busroute'] });
+  }
   const st = await L.status();
   if (st.state === 'none' || st.state === 'bad') { if (st.state === 'bad') L.logout(); return showLogin(st.state === 'bad' ? '利用許可証を確認できなかったため、ログインし直してください。' : ''); }
   if (st.state === 'expired') {
