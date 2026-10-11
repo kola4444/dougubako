@@ -1,0 +1,15 @@
+{
+  "name": "どうぐばこ",
+  "short_name": "どうぐばこ",
+  "description": "幼稚園の先生のための道具箱",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#eef3f1",
+  "theme_color": "#2f7d6b",
+  "icons": [
+    { "src": "icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

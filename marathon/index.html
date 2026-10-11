@@ -2,17 +2,17 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<!-- 安全のための決まり：このアプリは名簿などをどこにも送れない（通信先は自分のサイトだけ。書体の読み込みを除く） -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<!-- 安全のための決まり：このアプリは名簿などをどこにも送れない（通信先は自分のサイトだけ） -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="表彰状">
 <title>マラソン表彰状メーカー</title>
 <!-- どうぐばこ共通：利用許可証（どうぐばこと同じ場所に置いたときだけ読み込まれる） -->
 <script defer src="../common/license.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;500;700&family=Shippori+Mincho:wght@400;500;700&family=Zen+Old+Mincho:wght@400;700&family=Klee+One:wght@400;600&family=Yuji+Syuku&family=Noto+Sans+JP:wght@400;500;700&family=Zen+Maru+Gothic:wght@400;500;700&display=swap">
+<!-- 書体：どうぐばこのサイトに置いたもの（一度読み込めばオフラインでも使える） -->
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="manifest" href="../manifest.webmanifest">
 <style>
 :root{
   --bg:#f6f3ec; --panel:#fffdf8; --line:#e4dccb; --text:#2d2a24; --muted:#7a7365;
@@ -828,6 +828,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 'use strict';
 // どうぐばこに戻るボタンは、Webで開いたときだけ表示（Macでダブルクリックした版では出さない）
 if (/^https?:$/.test(location.protocol)) document.getElementById('boxBack').hidden = false;
+// オフライン対応：どうぐばこ共通の仕組み（sw.js）に登録し、端末に保存したデータ（印鑑など）が自動で消されにくくする
+if (/^https?:$/.test(location.protocol)) {
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(() => {});
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+}
 // どうぐばこの利用許可証を確かめる（どうぐばこと同じ場所に置いたときだけ。Macで単体で使うときは確認しない）
 document.addEventListener('DOMContentLoaded', () => { if (window.DouguLicense) window.DouguLicense.guardApp('marathon', '../'); });
 /* ===== 定数 ===== */

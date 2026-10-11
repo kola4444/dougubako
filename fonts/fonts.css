@@ -1,0 +1,21 @@
+/* 書体（自分のサイトに置いたもの）
+   ・Google Fonts から読み込む代わりに、このサイトの fonts/ フォルダから読み込む
+   ・使う書体だけが、使うときに読み込まれる。一度読み込めば端末に保存され、ネットがなくても使える
+   ・ライセンス：SIL Open Font License 1.1（fonts/OFL.txt） */
+@font-face{font-family:"Noto Serif JP";font-weight:400;font-display:swap;src:url(NotoSerifJP-400.woff2) format("woff2")}
+@font-face{font-family:"Noto Serif JP";font-weight:500;font-display:swap;src:url(NotoSerifJP-500.woff2) format("woff2")}
+@font-face{font-family:"Noto Serif JP";font-weight:700;font-display:swap;src:url(NotoSerifJP-700.woff2) format("woff2")}
+@font-face{font-family:"Noto Sans JP";font-weight:400;font-display:swap;src:url(NotoSansJP-400.woff2) format("woff2")}
+@font-face{font-family:"Noto Sans JP";font-weight:500;font-display:swap;src:url(NotoSansJP-500.woff2) format("woff2")}
+@font-face{font-family:"Noto Sans JP";font-weight:700;font-display:swap;src:url(NotoSansJP-700.woff2) format("woff2")}
+@font-face{font-family:"Shippori Mincho";font-weight:400;font-display:swap;src:url(ShipporiMincho-400.woff2) format("woff2")}
+@font-face{font-family:"Shippori Mincho";font-weight:500;font-display:swap;src:url(ShipporiMincho-500.woff2) format("woff2")}
+@font-face{font-family:"Shippori Mincho";font-weight:700;font-display:swap;src:url(ShipporiMincho-700.woff2) format("woff2")}
+@font-face{font-family:"Zen Old Mincho";font-weight:400;font-display:swap;src:url(ZenOldMincho-400.woff2) format("woff2")}
+@font-face{font-family:"Zen Old Mincho";font-weight:700;font-display:swap;src:url(ZenOldMincho-700.woff2) format("woff2")}
+@font-face{font-family:"Klee One";font-weight:400;font-display:swap;src:url(KleeOne-400.woff2) format("woff2")}
+@font-face{font-family:"Klee One";font-weight:600;font-display:swap;src:url(KleeOne-600.woff2) format("woff2")}
+@font-face{font-family:"Yuji Syuku";font-weight:400;font-display:swap;src:url(YujiSyuku-400.woff2) format("woff2")}
+@font-face{font-family:"Zen Maru Gothic";font-weight:400;font-display:swap;src:url(ZenMaruGothic-400.woff2) format("woff2")}
+@font-face{font-family:"Zen Maru Gothic";font-weight:500;font-display:swap;src:url(ZenMaruGothic-500.woff2) format("woff2")}
+@font-face{font-family:"Zen Maru Gothic";font-weight:700;font-display:swap;src:url(ZenMaruGothic-700.woff2) format("woff2")}

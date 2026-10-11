@@ -37,3 +37,10 @@ services:
       - path: /*
         name: X-Robots-Tag
         value: noindex
+      # オフライン対応の仕組み（sw.js）と設定（manifest）は、更新がすぐ届くよう毎回確認させる
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache
+      - path: /manifest.webmanifest
+        name: Cache-Control
+        value: no-cache

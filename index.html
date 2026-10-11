@@ -2,27 +2,28 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<!-- 安全のための決まり：このページは自分のサイト以外と通信しない（書体の読み込みを除く） -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<!-- 安全のための決まり：このページは自分のサイト以外と通信しない -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="どうぐばこ">
 <meta name="theme-color" content="#2f7d6b">
-<title>園のどうぐばこ</title>
+<title>どうぐばこ</title>
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap">
+<link rel="manifest" href="manifest.webmanifest">
 <script defer src="common/license.js"></script>
 <style>
+/* 見出しの書体（どうぐばこの画面で使う文字だけの小さな版。サイトに置いてあり、オフラインでも使える） */
+@font-face{font-family:"Zen Maru Gothic Box";font-weight:500;font-display:swap;src:url(fonts/ZenMaruGothic-box-500.woff2) format("woff2")}
+@font-face{font-family:"Zen Maru Gothic Box";font-weight:700;font-display:swap;src:url(fonts/ZenMaruGothic-box-700.woff2) format("woff2")}
 :root{
   --bg:#eef3f1; --surface:#ffffff; --ink:#1f2a2e; --muted:#5d6c70; --line:#d9e3df;
   --accent:#2f7d6b; --accent-ink:#ffffff; --accent-soft:#e0f0ea; --net:#b45309;
   --bad:#c92a2a; --bad-soft:#fdecec; --warn:#9a5b00; --warn-soft:#fff4dc;
   --c-shou:#d47a24; --c-jimu:#5f8a34; --c-wait:#a9b4b7; --demo:#6741d9; --demo-soft:#efeafd;
-  --f-disp:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans",sans-serif;
+  --f-disp:"Zen Maru Gothic Box","Hiragino Maru Gothic ProN","Hiragino Sans",sans-serif;
   --f-body:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,system-ui,sans-serif;
 }
 @media (prefers-color-scheme: dark){:root{
@@ -93,13 +94,17 @@ section h2 small{font:400 .76rem var(--f-body);color:var(--muted)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:16px 8px}
 .app{display:flex;flex-direction:column;align-items:center;gap:6px;text-decoration:none;color:var(--ink);background:none;border:0;padding:4px 0;font:inherit;cursor:pointer;border-radius:12px;position:relative}
 .app:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.app .tile{width:66px;height:66px;border-radius:17px;display:grid;place-items:center;color:#fff;font:700 1.75rem var(--f-disp);transition:transform .15s}
+.app .tile{width:66px;height:66px;border-radius:17px;display:grid;place-items:center;color:#fff;transition:transform .15s}
+.app .tile svg{width:46px;height:46px;display:block}
 .app:hover .tile{transform:translateY(-2px)}
 .app > span:last-child{font-size:.78rem;line-height:1.3;text-align:center}
 .app .net{position:absolute;top:-4px;right:calc(50% - 44px);background:var(--net);color:#fff;font-size:.58rem;font-weight:700;padding:1px 6px;border-radius:999px;font-style:normal}
 .app .lock{position:absolute;top:-6px;left:calc(50% - 42px);font-size:.95rem;font-style:normal}
-.app.wait .tile,.app.locked .tile{background:var(--c-wait)!important}
-.app.wait > span:last-child,.app.locked > span:last-child{color:var(--muted)}
+.app.locked .tile{background:var(--c-wait)!important}
+.app.soon .tile{background:var(--c-wait)}
+.app.soon > span:last-child{color:var(--muted)}
+.app .badge{position:absolute;top:-5px;right:calc(50% - 46px);background:var(--muted);color:var(--surface);font-size:.58rem;font-weight:700;padding:1px 6px;border-radius:999px;font-style:normal}
+.app.locked > span:last-child{color:var(--muted)}
 .legend{margin:12px 0 0;font-size:.76rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 14px}
 .legend i{display:inline-block;background:var(--net);color:#fff;font-style:normal;font-size:.6rem;font-weight:700;padding:0 6px;border-radius:999px;margin-right:4px;vertical-align:1px}
 .privacy{background:var(--accent-soft);border-radius:14px;padding:12px 16px;font-size:.84rem;line-height:1.7}
@@ -188,7 +193,7 @@ async function backgroundRenew(prev) {
 function showLogin(errMsg, email = '') {
   show(`<div class="center"><form class="card" id="fLogin" novalidate>
     <img class="logo" src="icon.svg" alt="">
-    <h1>園のどうぐばこ</h1>
+    <h1>どうぐばこ</h1>
     <p>園から届いた招待メールに書かれた<br>メールアドレスとパスワードでログインします。</p>
     ${errMsg ? `<div class="err">${esc(errMsg)}</div>` : ''}
     <label class="fld">メールアドレス<input id="em" type="email" autocomplete="username" inputmode="email" value="${esc(email)}" placeholder="例：sensei@example.com"></label>
@@ -287,36 +292,44 @@ function showBlocked(kind, pl) {
 }
 
 /* ---------- メニュー ---------- */
-const APPS = [
-  { id: 'marathon', k: '賞', n: 'マラソン大会<br>表彰状', color: 'var(--c-shou)', href: 'marathon/' },
-  { id: 'busroute', k: '車', n: 'バスルート<br>計画', color: 'var(--c-jimu)', href: 'busroute/', net: true },
+const ICONS = {
+  nandemo: '<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="5" width="32" height="30" rx="3.5" fill="#fff"/><rect x="11.5" y="8.5" width="25" height="23" rx="2" fill="none" stroke="#d9dfe1" stroke-width="1.6"/><path d="M16 15h16M16 20.5h16M19 26h10" stroke="#b9c2c5" stroke-width="2.4" stroke-linecap="round"/><path d="M19.6 37 17 46l3.8-1.9 2.4 3.3 1.2-8.6zM28.4 37 31 46l-3.8-1.9-2.4 3.3-1.2-8.6z" fill="#ff8fa3"/><circle cx="24" cy="34" r="7" fill="#ff6b81" stroke="#fff" stroke-width="2.4"/><circle cx="24" cy="34" r="3" fill="#fff"/><path d="M40.5 2.5l1.2 3.1 3.1 1.2-3.1 1.2-1.2 3.1-1.2-3.1-3.1-1.2 3.1-1.2z" fill="#ffd23f"/></svg>',
+  marathon: '<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="7" y="6" width="27" height="33" rx="3.5" fill="#fff"/><path d="M12.5 14h16M12.5 20h16M12.5 26h9" stroke="#e8a35c" stroke-width="2.6" stroke-linecap="round"/><path d="M30.2 36.5 27.4 45l3.8-1.7 2.3 3.2 1.4-8.2zM39.8 36.5l2.8 8.5-3.8-1.7-2.3 3.2-1.4-8.2z" fill="#fff"/><circle cx="35" cy="32" r="8" fill="#ffd23f" stroke="#fff" stroke-width="2.6"/><path d="m35 27.6 1.35 2.75 3.03.44-2.19 2.13.52 3.02L35 34.52l-2.71 1.42.52-3.02-2.19-2.13 3.03-.44z" fill="#fff"/></svg>',
+  busroute: '<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="11" width="40" height="24" rx="6" fill="#fff"/><rect x="8.5" y="15.5" width="7.5" height="7.5" rx="1.8" fill="#8fbf62"/><rect x="19" y="15.5" width="7.5" height="7.5" rx="1.8" fill="#8fbf62"/><rect x="29.5" y="15.5" width="10" height="9.5" rx="1.8" fill="#8fbf62"/><rect x="4" y="27.5" width="40" height="2.6" fill="#cfe3b9"/><circle cx="41" cy="31.5" r="1.6" fill="#ffd23f"/><circle cx="14" cy="35.5" r="5" fill="#33413a" stroke="#fff" stroke-width="2.6"/><circle cx="34" cy="35.5" r="5" fill="#33413a" stroke="#fff" stroke-width="2.6"/></svg>',
+};
+// 準備中のアプリ（できあがったら APPS に移す）
+const SOON = [
+  { id: 'nandemo', name: 'なんでも賞状', n: 'なんでも<br>賞状' },
 ];
-const WAIT = [['運', '運動会の賞状'], ['皆', '皆勤賞'], ['修', '修了証書'], ['卒', '卒園証書'], ['名', '名札'], ['貼', '持ち物シール'], ['靴', '下駄箱ラベル'], ['絵', '作品ラベル'], ['出', '出席簿'], ['席', '座席表'], ['誕', '誕生日カード'], ['番', '行事プログラム']];
+const APPS = [
+  { id: 'marathon', n: 'マラソン大会<br>表彰状', color: 'var(--c-shou)', href: 'marathon/' },
+  { id: 'busroute', n: 'バスルート<br>計画', color: 'var(--c-jimu)', href: 'busroute/', net: true },
+];
 function showMenu(pl) {
   const near = daysLeft(pl) <= 7;
   show(`<div class="wrap">
     <div class="top">
       <img src="icon.svg" alt="">
-      <div class="ttl"><h1>園のどうぐばこ</h1><p>${esc(pl.orgName)}</p></div>
+      <div class="ttl"><h1>どうぐばこ</h1><p>${esc(pl.orgName)}</p></div>
       <button class="chip ${near ? 'warn' : ''}" id="chip" type="button"><span class="dot"></span><span>${esc(pl.staff)}<small>${esc(L.PLANS[pl.plan].name)}プラン・あと${daysLeft(pl)}日有効</small></span></button>
     </div>
     <section>
       <h2>使えるアプリ</h2>
       <div class="grid">${APPS.map(a => {
         const ok = pl.apps.includes(a.id);
-        return ok ? `<a class="app" href="${a.href}">${a.net ? '<em class="net">ネット</em>' : ''}<span class="tile" style="background:${a.color}">${a.k}</span><span>${a.n}</span></a>`
-          : `<button class="app locked" type="button" data-lock="${a.id}"><em class="lock">🔒</em><span class="tile">${a.k}</span><span>${a.n}</span></button>`;
+        return ok ? `<a class="app" href="${a.href}">${a.net ? '<em class="net">ネット</em>' : ''}<span class="tile" style="background:${a.color}">${ICONS[a.id]}</span><span>${a.n}</span></a>`
+          : `<button class="app locked" type="button" data-lock="${a.id}"><em class="lock">🔒</em><span class="tile">${ICONS[a.id]}</span><span>${a.n}</span></button>`;
       }).join('')}</div>
       <p class="legend"><span><i>ネット</i>地図などのためにインターネットを使うアプリ（園児の情報は送りません）</span>${APPS.some(a => !pl.apps.includes(a.id)) ? '<span>🔒 今のプランでは使えないアプリ</span>' : ''}</p>
     </section>
     <section>
       <h2>準備中のアプリ <small>これから増えていきます</small></h2>
-      <div class="grid">${WAIT.map(([k, n]) => `<button class="app wait" type="button" data-n="${n}"><span class="tile">${k}</span><span>${n}</span></button>`).join('')}</div>
+      <div class="grid">${SOON.map(a => `<button class="app soon" type="button" data-soon="${esc(a.name)}"><em class="badge">準備中</em><span class="tile">${ICONS[a.id]}</span><span>${a.n}</span></button>`).join('')}</div>
     </section>
     <div class="privacy">🔒 名簿・印鑑・コースなど、アプリで使うデータは<b>この端末（iPad・パソコン）の中だけ</b>に保存されます。どうぐばこのサーバーに送られることはありません。</div>
   </div>`);
   $('#chip').onclick = () => accountDialog(pl);
-  document.querySelectorAll('[data-n]').forEach(b => b.onclick = () => toast(`「${b.dataset.n}」は準備中です`));
+  document.querySelectorAll('[data-soon]').forEach(b => b.onclick = () => toast(`「${b.dataset.soon}」は準備中です。できあがったら、ここから使えるようになります`, 3200));
   document.querySelectorAll('[data-lock]').forEach(b => b.onclick = () => {
     const plan = Object.values(L.PLANS).find(p => p.apps.includes(b.dataset.lock));
     openDlg(`<div class="dlg"><h3>🔒 ${L.APP_NAMES[b.dataset.lock]}</h3><p style="margin:0;font-size:.9rem;line-height:1.7">このアプリは<b>${plan.name}プラン</b>で使えます。園の管理者がプランを変更すると、次にどうぐばこを開いたときから使えるようになります。</p><div class="row"><button class="btn" data-close type="button">閉じる</button></div></div>`);
@@ -394,6 +407,11 @@ async function demoMenu() {
 }
 $('#demoBtn').onclick = demoMenu;
 
+// オフライン対応：一度開いたアプリを端末に保存する（sw.js）。端末に保存したデータが自動で消されにくくする
+if (/^https?:$/.test(location.protocol)) {
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+}
 document.addEventListener('DOMContentLoaded', () => {
   L = window.DouguLicense;
   if (!L) show('<div class="center"><div class="card"><h2>読み込みに失敗しました</h2><p>common/license.js が見つかりません。</p></div></div>');
