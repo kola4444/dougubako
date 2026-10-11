@@ -204,6 +204,36 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
 .bphoto{width:64px;height:44px;object-fit:cover;border-radius:4px;vertical-align:middle;border:1px solid var(--line)}
 .page .pmap{width:700px;height:600px;border:1px solid #000}
 .page .foot{font-size:10px;color:#555;margin-top:4px}
+.rpt h1{margin-bottom:6px}
+.rpt .rmeta{font-size:11px;color:#333;margin-bottom:10px}
+.rpt h2{font-size:15px;border-left:8px solid #000;padding-left:6px;margin:14px 0 6px}
+.rpt h2 small{font-weight:400;font-size:12px}
+.rpt h2.plain{border-left-color:#1f2328}
+.rpt table{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:6px}
+.rpt th,.rpt td{border:1px solid #000;padding:2px 4px;font-weight:400;vertical-align:middle}
+.rpt th{background:#eee;font-weight:700}
+.rpt td.c{text-align:center}
+.rpt td.t{white-space:nowrap;font-variant-numeric:tabular-nums;width:92px}
+.rpt .was{color:#666;text-decoration:line-through}
+.rpt small.late{color:#c92a2a;margin-left:2px} .rpt small.early{color:#2b8a3e;margin-left:2px}
+.rpt .sw{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px}
+.rpt .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:8px 0}
+.rpt .kpis div{border:1.5px solid #000;border-radius:6px;text-align:center;padding:4px;font-size:11px}
+.rpt .kpis b{display:block;font-size:22px}
+.rpt .items{font-size:12px;margin:4px 0;padding-left:20px}
+.rpt .items li{margin:1px 0}
+.rpt .note2{font-size:10.5px;color:#444}
+.rpt .meta{font-size:12px;margin:2px 0 6px;padding-left:20px}
+.rpt .nochg{font-size:12px;color:#444;margin:2px 0 6px}
+.rpt .rblock{break-inside:avoid}
+.rpt tr.sch td{background:#f6f6f6;font-weight:700}
+.rpt .k-new td,.rpt .legend .k-new{background:#e3f6e8}
+.rpt .k-mod td,.rpt .legend .k-mod{background:#fff3cd}
+.rpt .k-time td,.rpt .legend .k-time{background:#e8f1fd}
+.rpt .k-del td,.rpt .legend .k-del{background:#fde4e4}
+.rpt .k-del td:nth-child(2){text-decoration:line-through}
+.rpt .legend{font-size:11px;margin-top:8px;display:flex;gap:8px}
+.rpt .legend span{padding:1px 8px;border:1px solid #999}
 .leaflet-tooltip.ptip{background:#fff;border:1.5px solid #000;border-radius:0;padding:0 4px;font:700 12px sans-serif;box-shadow:none;color:#000}
 @media print{
   @page{size:A4 portrait;margin:10mm}
@@ -283,6 +313,12 @@ body.insetup header > button:not(#btnHelp),body.insetup header .scn,body.insetup
 .setup td input{width:100%;min-width:0;font-size:16px;padding:4px 6px}
 .setup .foot{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 .setup .foot .left{margin-right:auto}
+.setup .startfile{background:#eef6f3;border:1px solid #cfe5dc;border-radius:10px;padding:12px;display:grid;gap:8px}
+.setup .startfile b{font-size:14px}
+.setup .startfile p{color:#3d5a52}
+.setup .startfile button{justify-self:start;background:#2f7d6b;border-color:#2f7d6b}
+.setup .or{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}
+.setup .or::before,.setup .or::after{content:"";flex:1;border-top:1px solid var(--line)}
 @media (max-width:900px){.setup{left:10px;max-width:calc(100% - 20px)}}
 </style>
 </head>
@@ -339,7 +375,7 @@ body.insetup header > button:not(#btnHelp),body.insetup header .scn,body.insetup
 </div>
 <div id="print-area"></div>
 <dialog id="dlg"><div class="dlg-h"><span id="dlgTitle"></span><button id="dlgX">✕</button></div><div class="dlg-b" id="dlgBody"></div><div class="dlg-f" id="dlgFoot"></div></dialog>
-<input type="file" id="fileIn" accept=".json,application/json" hidden>
+<input type="file" id="fileIn" accept=".json,application/json,text/plain" hidden>
 <div id="toast"></div>
 
 <script>
@@ -575,12 +611,15 @@ function ensureCalcs() {
 }
 function retryRouting() { for (const k in calc) if (calc[k].status === 'approx') delete calc[k]; render(); toast('経路を再取得しています…'); }
 
+function timingCore(stops, legs, startStr, f, dw) {
+  const t0 = toMin(startStr); let t = t0; const arr = [];
+  stops.forEach((s, i) => { t += (legs[i]?.dur || 0) * f / 60; arr.push(t); if (!s.via) t += dw; });
+  t += (legs[stops.length]?.dur || 0) * f / 60;
+  return { arr, end: t, total: t - t0, dist: legs.reduce((a, l) => a + (l.dist || 0), 0) };
+}
 function timing(r, pat) {
-  const c = legsFor(r); const f = factor(); const dw = +state.settings.dwell || 0;
-  const t0 = toMin(r.start[pat]); let t = t0; const arr = [];
-  r.stops.forEach((s, i) => { t += (c.legs[i]?.dur || 0) * f / 60; arr.push(t); if (!s.via) t += dw; });
-  t += (c.legs[r.stops.length]?.dur || 0) * f / 60;
-  return { arr, end: t, total: t - t0, dist: c.legs.reduce((a, l) => a + l.dist, 0), status: c.status };
+  const c = legsFor(r);
+  return { ...timingCore(r.stops, c.legs, r.start[pat], factor(), +state.settings.dwell || 0), status: c.status };
 }
 function paxOf(r) { return r.stops.reduce((a, s) => a + (s.via ? 0 : (+s.pax || 0)), 0); }
 function stopCount(r) { return r.stops.filter(s => !s.via).length; }
@@ -1261,13 +1300,195 @@ function exportKML() {
 function exportJSON() { download(`バスルート案_${state.name}.json`, JSON.stringify(state, null, 1), 'application/json'); }
 
 /* ============================================================
+   比較ページ（変更概要・変更詳細）
+   ============================================================ */
+const PATS = ['am', 'pm', 'half'];
+const ORIG_KEY = { am: 'orig', pm: 'origPm', half: 'origHalf' };
+const ORIG_END = { am: 'origEnd', pm: 'origEndPm', half: 'origEndHalf' };
+// 比較の基準（現行）：初期設定で読み込んだファイル、または「案の保存・読込」で基準にした案
+const LS_BASE = BOX.ns + 'baseline.v1';
+function loadBaseline() { try { return JSON.parse(localStorage.getItem(LS_BASE)) || null; } catch (e) { return null; } }
+function saveBaseline(label, sc) { try { localStorage.setItem(LS_BASE, JSON.stringify({ label, at: Date.now(), sc: JSON.parse(JSON.stringify(sc)) })); return true; } catch (e) { return false; } }
+function clearBaseline() { try { localStorage.removeItem(LS_BASE); } catch (e) { } }
+function hasOrigTimes(sc) { return sc.routes.some(r => r.origEnd && r.stops.some(x => x.orig)); }
+function baselineOf(src) {
+  if (src === '__base') { const b = loadBaseline(); return b ? { label: b.label, sc: JSON.parse(JSON.stringify(b.sc)), useOrig: true } : null; }
+  const sv = loadSaved()[src];
+  return sv ? { label: '「' + src + '」', sc: JSON.parse(JSON.stringify(sv.state)), useOrig: false } : null;
+}
+// 任意の案の各コース・各停留所の時刻
+async function scenarioTimes(sc, useOrig) {
+  const out = {};
+  const f = sc.settings?.factor ?? factor(); const dw = +(sc.settings?.dwell ?? state.settings.dwell) || 0;
+  for (const r of sc.routes) {
+    const T = {};
+    if (useOrig && r.origEnd && r.stops.every(s => s.via || s.orig)) {
+      for (const p of PATS) {
+        const shift = toMin(r.start[p]) - toMin(r.start.am);
+        const arr = r.stops.map(s => s.via ? null : (s[ORIG_KEY[p]] ? toMin(s[ORIG_KEY[p]]) : toMin(s.orig) + shift));
+        const end = r[ORIG_END[p]] ? toMin(r[ORIG_END[p]]) : toMin(r.origEnd) + shift;
+        T[p] = { arr, end, total: end - toMin(r.start[p]) };
+      }
+    } else {
+      const pts = [sc.school, ...r.stops, sc.school]; const key = keyOf(pts);
+      let legs = routeCache[key]?.legs;
+      if (!legs && r.stops.length) { const res = await fetchRoute(pts); if (res) { cacheSet(key, res); legs = res.legs; } }
+      if (!legs) legs = approxCalc(pts, key).legs;
+      for (const p of PATS) T[p] = timingCore(r.stops, legs, r.start[p], f, dw);
+    }
+    out[r.id] = T;
+  }
+  return out;
+}
+function buildDiff(base, baseT, cur, curT, thr) {
+  const flat = sc => sc.routes.flatMap(r => { let n = 0; return r.stops.map((s, i) => s.via ? null : { s, rid: r.id, i, num: ++n }).filter(Boolean); });
+  const B = flat(base), C = flat(cur);
+  const norm = x => String(x || '').replace(/[\s　]/g, '');
+  const pair = new Map(), usedB = new Set();
+  const pass = cond => {
+    for (const c of C) {
+      if (pair.has(c)) continue;
+      let best = null, bd = Infinity;
+      for (const b of B) { if (usedB.has(b) || !cond(b, c)) continue; const d = haversine(b.s, c.s); if (d < bd) { bd = d; best = b; } }
+      if (best) { pair.set(c, best); usedB.add(best); }
+    }
+  };
+  pass((b, c) => b.s.id === c.s.id);
+  pass((b, c) => norm(b.s.name) === norm(c.s.name) && b.rid === c.rid);
+  pass((b, c) => norm(b.s.name) === norm(c.s.name));
+  pass((b, c) => b.rid === c.rid && haversine(b.s, c.s) < 150);
+  pass((b, c) => haversine(b.s, c.s) < 150);
+  const bRoute = id => base.routes.find(r => r.id === id), cRoute = id => cur.routes.find(r => r.id === id);
+  const bt = (b, p) => baseT[b.rid][p].arr[b.i], ct = (c, p) => curT[c.rid][p].arr[c.i];
+  const cnt = { added: 0, removed: 0, moved: 0, relocated: 0, renamed: 0, reordered: 0, timed: 0 };
+  const items = [];   // 主な変更点
+  const routes = [];
+  const allIds = [...cur.routes.map(r => r.id), ...base.routes.filter(r => !cRoute(r.id)).map(r => r.id)];
+  const ordered = [...sortedRoutesOf(cur), ...base.routes.filter(r => !cRoute(r.id))].map(r => r.id).filter((id, i, a) => a.indexOf(id) === i && allIds.includes(id));
+  for (const rid of ordered) {
+    const br = bRoute(rid), cr = cRoute(rid);
+    const R = { id: rid, name: (cr || br).name, color: (cr || br).color, br, cr, meta: [], rows: [], gone: [], changed: false };
+    if (!br) { R.meta.push('新しく作るコース'); items.push(`【コース新設】${cr.name}`); }
+    if (!cr) { R.meta.push('このコースは無くなります'); items.push(`【コース廃止】${br.name}`); }
+    if (br && cr) {
+      if (br.name !== cr.name) R.meta.push(`コース名：${br.name} → ${cr.name}`);
+      if (br.busId !== cr.busId) { const n = (sc, id) => (sc.buses.find(b => b.id === id) || {}).name || id; R.meta.push(`バス：${n(base, br.busId)} → ${n(cur, cr.busId)}`); items.push(`【バス変更】${cr.name}：${n(base, br.busId)} → ${n(cur, cr.busId)}`); }
+      if (br.trip !== cr.trip) R.meta.push(`便：${br.trip}便 → ${cr.trip}便`);
+      for (const p of PATS) if (toMin(br.start[p]) !== toMin(cr.start[p])) { R.meta.push(`園の出発（${PAT_LABEL[p]}）：${fmt(toMin(br.start[p]))} → ${fmt(toMin(cr.start[p]))}`); items.push(`【出発時刻】${cr.name} ${PAT_LABEL[p]}：${fmt(toMin(br.start[p]))} → ${fmt(toMin(cr.start[p]))}`); }
+    }
+    if (cr) {
+      // 前後関係が実際に入れ替わった停留所だけを「順番変更」とする（最長増加部分列の外にあるもの）
+      const same = C.filter(x => x.rid === rid && pair.get(x)?.rid === rid);
+      const seq = same.map(x => pair.get(x).num); const n = seq.length;
+      const len = new Array(n).fill(1), prev = new Array(n).fill(-1);
+      for (let i = 0; i < n; i++) for (let j = 0; j < i; j++) if (seq[j] < seq[i] && len[j] + 1 > len[i]) { len[i] = len[j] + 1; prev[i] = j; }
+      const keep = new Set(); let bi = len.indexOf(Math.max(0, ...len)); while (bi >= 0) { keep.add(same[bi]); bi = prev[bi]; }
+      const reordered = new Set(same.filter(x => !keep.has(x)));
+      for (const c of C.filter(x => x.rid === rid)) {
+        const b = pair.get(c); const ch = []; let kind = '';
+        if (!b) { kind = 'new'; ch.push('新設'); cnt.added++; items.push(`【新設】${c.s.name}（${cr.name} ${c.num}番目・登園 ${fmt(ct(c, 'am'))}）`); }
+        else {
+          if (b.rid !== rid) { kind = 'mod'; ch.push(`${bRoute(b.rid).name}から移動`); cnt.moved++; items.push(`【コース変更】${c.s.name}：${bRoute(b.rid).name} → ${cr.name}（登園 ${fmt(bt(b, 'am'))} → ${fmt(ct(c, 'am'))}）`); }
+          if (norm(b.s.name) !== norm(c.s.name)) { kind = 'mod'; ch.push(`名称変更（旧：${b.s.name}）`); cnt.renamed++; items.push(`【名称変更】${b.s.name} → ${c.s.name}`); }
+          const d = haversine(b.s, c.s);
+          if (d > 30) { kind = 'mod'; ch.push(`場所を変更（約${Math.round(d / 10) * 10}m）`); cnt.relocated++; items.push(`【場所変更】${c.s.name}（約${Math.round(d / 10) * 10}m移動）`); }
+          if (reordered.has(c)) { kind = kind || 'mod'; ch.push(`順番を変更（${b.num}→${c.num}番目）`); cnt.reordered++; items.push(`【順番変更】${c.s.name}（${cr.name} ${b.num}番目 → ${c.num}番目）`); }
+        }
+        const t = PATS.map(p => { const now = ct(c, p); const was = b ? bt(b, p) : null; const diff = was == null ? null : Math.round(now) - Math.round(was); return { now, was, diff, show: diff != null && Math.abs(diff) >= thr }; });
+        if (b && t.some(x => x.show)) { cnt.timed++; if (!kind) kind = 'time'; }
+        if (kind || ch.length) R.changed = true;
+        R.rows.push({ num: c.num, name: c.s.name, ch, kind, t });
+      }
+      R.end = PATS.map(p => { const now = curT[rid][p].end; const was = br ? baseT[rid][p].end : null; const diff = was == null ? null : Math.round(now) - Math.round(was); return { now, was, diff, show: diff != null && Math.abs(diff) >= thr }; });
+      R.startT = PATS.map(p => ({ now: toMin(cr.start[p]), was: br ? toMin(br.start[p]) : null }));
+    }
+    if (br) {
+      for (const b of B.filter(x => x.rid === rid)) {
+        const c = [...pair.entries()].find(([, v]) => v === b)?.[0];
+        if (!c) { R.gone.push({ name: b.s.name, num: b.num, was: PATS.map(p => bt(b, p)), to: null }); cnt.removed++; items.push(`【廃止】${b.s.name}（${br.name}）`); R.changed = true; }
+        else if (c.rid !== rid) { R.gone.push({ name: b.s.name, num: b.num, was: PATS.map(p => bt(b, p)), to: cRoute(c.rid).name, now: PATS.map(p => ct(c, p)) }); R.changed = true; }
+      }
+    }
+    if (R.meta.length) R.changed = true;
+    R.stat = {
+      bStops: br ? br.stops.filter(s => !s.via).length : 0, cStops: cr ? cr.stops.filter(s => !s.via).length : 0,
+      bTotal: br ? baseT[rid].am.total : null, cTotal: cr ? curT[rid].am.total : null,
+      bEnd: br ? baseT[rid].am.end : null, cEnd: cr ? curT[rid].am.end : null,
+    };
+    routes.push(R);
+  }
+  return { routes, cnt, items };
+}
+function sortedRoutesOf(sc) { const bo = id => sc.buses.findIndex(b => b.id === id); return [...sc.routes].sort((a, b) => bo(a.busId) - bo(b.busId) || a.trip - b.trip); }
+function tcell(x) {
+  if (x.was == null || !x.show) return fmt(x.now);
+  return `<span class="was">${fmt(x.was)}</span>→<b>${fmt(x.now)}</b><small class="${x.diff > 0 ? 'late' : 'early'}">${x.diff > 0 ? '+' : ''}${x.diff}分</small>`;
+}
+function diffPagesHTML(D, baseLabel, thr) {
+  const c = D.cnt; const today = new Date().toLocaleDateString('ja-JP');
+  const ls = ['bStops', 'cStops'];
+  let h = `<div class="page rpt"><h1>バスルート 変更概要</h1>
+    <div class="rmeta">比較：${esc(baseLabel)} → 「${esc(state.name)}」　／　作成日 ${today}　／　時刻の変更は${thr}分以上の差を表示</div>
+    <div class="kpis">
+      <div><b>${c.added}</b>新設</div><div><b>${c.removed}</b>廃止</div><div><b>${c.moved}</b>コース変更</div>
+      <div><b>${c.relocated}</b>場所変更</div><div><b>${c.renamed + c.reordered}</b>名称・順番変更</div><div><b>${c.timed}</b>時刻が変わる停留所</div></div>
+    <h2 class="plain">コース別の比較（登園）</h2>
+    <table class="sum"><tr><th>コース</th><th>停留所数</th><th>園の出発 → 到着</th><th>所要時間</th><th>変更</th></tr>
+    ${D.routes.map(R => {
+      const s = R.stat; const n = R.rows.filter(r => r.kind === 'new').length, mv = R.rows.filter(r => r.ch.some(x => x.endsWith('から移動'))).length, gone = R.gone.length, tm = R.rows.filter(r => r.kind && r.t.some(x => x.show)).length;
+      const md = R.rows.filter(r => r.ch.some(x => /^(場所|名称|順番)/.test(x))).length;
+      const tags = [n && `新設${n}`, mv && `移入${mv}`, gone && `外れる${gone}`, md && `場所・名称・順番${md}`, tm && `時刻変更${tm}`, R.meta.length && 'コース設定'].filter(Boolean).join('・') || '変更なし';
+      const st = R.cr ? toMin(R.cr.start.am) : null, bst = R.br ? toMin(R.br.start.am) : null;
+      return `<tr><td><span class="sw" style="background:${R.color}"></span>${esc(R.name)}</td>
+        <td class="c">${R.br ? s.bStops : '—'} → ${R.cr ? s.cStops : '—'}</td>
+        <td class="c">${R.br ? fmt(bst) + '→' + fmt(s.bEnd) : '—'}<br>${R.cr ? '<b>' + fmt(st) + '→' + fmt(s.cEnd) + '</b>' : '—'}</td>
+        <td class="c">${R.br ? Math.round(s.bTotal) + '分' : '—'} → <b>${R.cr ? Math.round(s.cTotal) + '分' : '—'}</b></td>
+        <td>${tags}</td></tr>`;
+    }).join('')}</table>
+    <div class="note2">※上段が比較元、下段（太字）が新しい案です。</div>
+    <h2 class="plain">主な変更点</h2>
+    ${D.items.length ? `<ul class="items">${D.items.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : '<p>停留所・コースの変更はありません。</p>'}
+    ${c.timed ? `<p>このほか、時刻が${thr}分以上変わる停留所が <b>${c.timed}か所</b> あります（次ページ以降の「変更詳細」を参照）。</p>` : ''}
+    <div class="note2">※${esc(baseLabel)}の時刻は${baseLabel.startsWith('現行') ? '現行の時刻表' : '計算値'}、新しい案の時刻は道路データによる計算値（目安）です。</div>
+  </div>`;
+  h += `<div class="page rpt"><h1>バスルート 変更詳細</h1><div class="rmeta">比較：${esc(baseLabel)} → 「${esc(state.name)}」　時刻は「変更前→変更後（差）」。${thr}分未満の差は変更後の時刻のみ表示。</div>`;
+  for (const R of D.routes) {
+    h += `<div class="rblock"><h2 style="border-color:${R.color}">${esc(R.name)}${R.cr ? `<small>（${R.cr.trip}便 ${esc(R.cr.area)}）</small>` : ''}</h2>`;
+    if (R.meta.length) h += `<ul class="meta">${R.meta.map(m => `<li>${esc(m)}</li>`).join('')}</ul>`;
+    if (!R.changed && !R.rows.some(r => r.t.some(x => x.show)) && !(R.end || []).some(x => x.show)) { h += `<p class="nochg">変更なし（時刻の差も${thr}分未満）</p></div>`; continue; }
+    if (R.cr) {
+      h += `<table class="det"><tr><th>番号</th><th>停留所名</th><th>変更内容</th><th>登園</th><th>降園</th><th>午前保育 降園</th></tr>
+        <tr class="sch"><td></td><td>幼稚園 出発</td><td>${R.startT.some(x => x.was != null && x.was !== x.now) ? '出発時刻を変更' : ''}</td>${R.startT.map(x => `<td class="t">${x.was != null && x.was !== x.now ? `<span class="was">${fmt(x.was)}</span>→<b>${fmt(x.now)}</b>` : fmt(x.now)}</td>`).join('')}</tr>
+        ${R.rows.map(r => `<tr class="k-${r.kind || 'none'}"><td class="c">${r.num}</td><td>${esc(r.name)}</td><td>${r.ch.map(esc).join('<br>') || (r.t.some(x => x.show) ? '時刻のみ変更' : '')}</td>${r.t.map(x => `<td class="t">${tcell(x)}</td>`).join('')}</tr>`).join('')}
+        <tr class="sch"><td></td><td>幼稚園 到着</td><td></td>${R.end.map(x => `<td class="t">${tcell(x)}</td>`).join('')}</tr></table>`;
+    }
+    if (R.gone.length) {
+      h += `<table class="det gone"><tr><th colspan="2">このコースから外れる停留所</th><th>変更内容</th><th>登園</th><th>降園</th><th>午前保育 降園</th></tr>
+        ${R.gone.map(g => `<tr class="k-${g.to ? 'mod' : 'del'}"><td class="c">${g.num}</td><td>${esc(g.name)}</td><td>${g.to ? '→ ' + esc(g.to) + 'へ移動' : '廃止'}</td>${g.was.map((w, i) => `<td class="t">${g.to ? `<span class="was">${fmt(w)}</span>→<b>${fmt(g.now[i])}</b>` : `<span class="was">${fmt(w)}</span>`}</td>`).join('')}</tr>`).join('')}</table>`;
+    }
+    h += `</div>`;
+  }
+  h += `<div class="legend"><span class="k-new">新設</span><span class="k-mod">移動・場所/名称/順番変更</span><span class="k-time">時刻のみ変更</span><span class="k-del">廃止</span></div></div>`;
+  return h;
+}
+async function buildDiffPages(baseSrc, thr) {
+  const bl = baselineOf(baseSrc); if (!bl) return '';
+  const baseT = await scenarioTimes(bl.sc, bl.useOrig);
+  const curT = {}; for (const r of state.routes) { curT[r.id] = {}; for (const p of PATS) curT[r.id][p] = timing(r, p); }
+  return diffPagesHTML(buildDiff(bl.sc, baseT, state, curT, thr), bl.label, thr);
+}
+
+
+/* ============================================================
    印刷（コース別ルートマップ）
    ============================================================ */
-async function printRoutes(ids) {
+async function printRoutes(ids, opt = {}) {
   const area = $('#print-area'); area.innerHTML = '';
-  toast('印刷用の地図を準備しています…', 8000);
+  toast('印刷用のページを準備しています…', 8000);
   // 経路の計算が終わるまで待つ（最大15秒）
-  for (let i = 0; i < 60 && ids.some(id => { const r = getRoute(id); return legsFor(r).status === 'loading'; }); i++) await sleep(250);
+  const waitIds = opt.diff ? state.routes.map(r => r.id) : ids;
+  for (let i = 0; i < 60 && waitIds.some(id => { const r = getRoute(id); return legsFor(r).status === 'loading'; }); i++) await sleep(250);
+  if (opt.diff) area.insertAdjacentHTML('beforeend', await buildDiffPages(opt.base || '__base', opt.thr ?? 1));
   const maps = [];
   for (const id of ids) {
     const r = getRoute(id); const bus = getBus(r.busId) || {};
@@ -1330,9 +1551,24 @@ function fitPrintMap(m, line, pts) {
   }
 }
 function printDialog() {
-  openDialog('コース別ルートマップを印刷', `<p>印刷するコースを選んでください（1コース＝A4縦1ページ。時刻表＋ルートマップ）。<br>印刷画面で「PDFに保存」を選ぶとPDFにできます。</p>
-    ${sortedRoutes().map(r => `<label style="display:block;margin:4px 0"><input type="checkbox" class="pr" value="${r.id}" checked> <span class="dot" style="background:${r.color}"></span>${esc(r.name)}（${r.trip}便 ${esc(r.area)}）</label>`).join('')}`,
-    [{ label: '印刷', primary: true, fn: () => { const ids = [...document.querySelectorAll('.pr:checked')].map(c => c.value); closeDialog(); if (ids.length) printRoutes(ids); } }]);
+  const saved = Object.keys(loadSaved());
+  const base = loadBaseline();
+  const opts = (base ? `<option value="__base">${esc(base.label)}</option>` : '') + saved.map(n => `<option value="${esc(n)}">保存した案「${esc(n)}」</option>`).join('');
+  openDialog('印刷（ルートマップ・変更概要）', `
+    <h3>コース別ルートマップ</h3>
+    <p class="note">1コース＝A4縦1ページ（時刻表＋ルートマップ）。印刷画面で「PDFに保存」を選ぶとPDFにできます。</p>
+    ${sortedRoutes().map(r => `<label style="display:block;margin:4px 0"><input type="checkbox" class="pr" value="${r.id}" checked> <span class="dot" style="background:${r.color}"></span>${esc(r.name)}（${r.trip}便 ${esc(r.area)}）</label>`).join('')}
+    <h3>変更概要・変更詳細</h3>
+    ${opts ? `<label style="display:block;margin:4px 0"><input type="checkbox" id="prDiff" checked> 先頭に「変更概要」「変更詳細」のページを付ける（全コース分）</label>
+    <div class="f"><span>比べる相手（変更前）</span><select id="prBase">${opts}</select></div>
+    <div class="f"><span>時刻の変更として表示する差</span><select id="prThr"><option value="1">1分以上（すべて）</option><option value="2">2分以上</option><option value="3" selected>3分以上</option><option value="5">5分以上</option></select></div>
+    <p class="note">※新しい案の時刻は道路データによる計算値です。停留所を変えていないコースでも、現行の時刻表と1〜2分ずれることがあるため、初期値は「3分以上」にしています。</p>`
+    : `<p class="note">比べる相手がありません。「💾案の保存・読込」で今の案を「比較の基準（現行）」にするか、案を保存すると、変更点のページを付けられます。</p>`}`,
+    [{ label: '印刷', primary: true, fn: () => {
+      const ids = [...document.querySelectorAll('.pr:checked')].map(c => c.value);
+      const opt = { diff: !!$('#prDiff')?.checked, base: $('#prBase')?.value, thr: +($('#prThr')?.value || 3) };
+      closeDialog(); if (ids.length || opt.diff) printRoutes(ids, opt);
+    } }]);
 }
 
 /* ============================================================
@@ -1356,6 +1592,10 @@ function scenarioDialog() {
     <div class="f"><span>今の案を名前を付けて保存</span><div style="display:flex;gap:6px"><input type="text" id="saveName" value="${esc(state.name)}" style="flex:1"><button class="primary" id="doSave">保存</button></div></div>
     <h3>保存した案</h3>
     ${names.length ? `<table>${names.map(n => `<tr><td><b>${esc(n)}</b><br><small>${new Date(saved[n].at).toLocaleString('ja-JP')}</small></td><td style="text-align:right;white-space:nowrap"><button class="ld" data-n="${esc(n)}">開く</button> <button class="dl" data-n="${esc(n)}">削除</button></td></tr>`).join('')}</table>` : '<p class="note">まだありません</p>'}
+    <h3>比較の基準（現行）</h3>
+    <p class="note">印刷の「変更概要・変更詳細」で、新しい案と比べる相手です。今の時刻表（現行）にあたる案を基準にしておきます。</p>
+    ${(b => b ? `<p><b>${esc(b.label)}</b><br><small>${new Date(b.at).toLocaleString('ja-JP')} に設定</small></p>` : '<p class="note">まだ設定されていません</p>')(loadBaseline())}
+    <div class="tools"><button id="doBase">今の案を比較の基準（現行）にする</button>${loadBaseline() ? '<button id="doBaseClr">基準を消す</button>' : ''}</div>
     <h3>ファイル</h3>
     <div class="tools"><button id="doExp">ファイルに書き出し（.json）</button><button id="doImp">ファイルから読み込み</button><button id="doReset" style="color:var(--bad)">初期設定からやり直す</button></div>`);
   $('#doSave').onclick = () => {
@@ -1366,6 +1606,11 @@ function scenarioDialog() {
   };
   document.querySelectorAll('.ld').forEach(b => b.onclick = () => { const s = loadSaved()[b.dataset.n]; if (!s) return; closeDialog(); replaceState(JSON.parse(JSON.stringify(s.state))); fitAll(); toast(`「${b.dataset.n}」を開きました`); });
   document.querySelectorAll('.dl').forEach(b => b.onclick = () => { if (!confirm(`「${b.dataset.n}」を削除しますか？`)) return; const sv = loadSaved(); delete sv[b.dataset.n]; localStorage.setItem(LS_SAVED, JSON.stringify(sv)); scenarioDialog(); });
+  $('#doBase').onclick = () => {
+    if (loadBaseline() && !confirm('比較の基準（現行）を、今の案で置き換えますか？')) return;
+    if (saveBaseline(`現行（「${state.name}」）`, state)) { toast('今の案を比較の基準（現行）にしました'); scenarioDialog(); } else alert('保存できませんでした（容量不足）');
+  };
+  $('#doBaseClr')?.addEventListener('click', () => { if (!confirm('比較の基準（現行）を消しますか？')) return; clearBaseline(); scenarioDialog(); });
   $('#doExp').onclick = exportJSON;
   $('#doImp').onclick = () => $('#fileIn').click();
   $('#doReset').onclick = () => {
@@ -1373,11 +1618,46 @@ function scenarioDialog() {
     closeDialog(); hist.past = []; hist.future = []; state = blankState(); save(); startSetup();
   };
 }
+// 保存したファイル（.json）を、今のアプリで使える形に整える（元のバスルート計画で書き出したものも読める）
+function normalizeImported(s) {
+  if (!s || typeof s !== 'object' || !Array.isArray(s.routes) || !s.school || !isFinite(+s.school.lat) || !isFinite(+s.school.lng)) throw new Error('bad file');
+  const st = { ...blankState(), ...s };
+  st.name = s.name || '読み込んだ案';
+  // 園名が入っていない（または「幼稚園」だけの）ファイルは、明青幼稚園として読み込む
+  const nm = (s.school.name || '').trim();
+  st.school = { name: nm && nm !== '幼稚園' ? nm : '明青幼稚園', lat: +s.school.lat, lng: +s.school.lng };
+  st.settings = { ...defaultSettings(), ...(s.settings || {}) };
+  st.buses = Array.isArray(s.buses) ? s.buses.filter(b => b && b.id) : [];
+  if (!st.buses.length) st.buses = [{ id: 'b' + uid(), name: 'バス1', capacity: 30, phone: '' }];
+  st.pool = Array.isArray(s.pool) ? s.pool.filter(x => x && isFinite(+x.lat)) : [];
+  st.routes = s.routes.filter(r => r && Array.isArray(r.stops)).map((r, i) => ({
+    ...r,   // 元のファイルにある項目（降園・午前の現行時刻など）はそのまま残す
+    id: r.id || 'r' + uid(), name: r.name || `コース${i + 1}`, area: r.area || '', trip: +r.trip || 1,
+    color: r.color || ROUTE_COLORS[i % ROUTE_COLORS.length], visible: r.visible !== false,
+    start: { am: '8:00', pm: '14:00', half: '11:00', ...(r.start || {}) }, origEnd: r.origEnd || null,
+    busId: st.buses.some(b => b.id === r.busId) ? r.busId : st.buses[0].id,
+    stops: r.stops.filter(x => x && isFinite(+x.lat) && isFinite(+x.lng)),
+  }));
+  return st;
+}
 $('#fileIn').addEventListener('change', async e => {
-  const f = e.target.files[0]; if (!f) return;
-  try { const s = JSON.parse(await f.text()); if (!s.routes || !s.school) throw 0; closeDialog(); replaceState(s); fitAll(); toast('読み込みました'); }
-  catch (err) { alert('このファイルは読み込めませんでした'); }
-  e.target.value = '';
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  let st;
+  try { st = normalizeImported(JSON.parse(await f.text())); }
+  catch (err) {
+    if (setup.active) toast('このファイルは読み込めませんでした。バスルート計画の「書き出し」や「案の保存」で保存した .json ファイルを選んでください', 6000);
+    else alert('このファイルは読み込めませんでした');
+    return;
+  }
+  if (setup.active) {
+    // 初期設定の画面から：読み込んだ内容でそのまま始める
+    if (setupMarker) { map.removeLayer(setupMarker); setupMarker = null; }
+    finishSetup(st);
+    saveBaseline(`現行（読み込んだ「${st.name}」）`, st);
+    toast(`「${st.name}」を読み込みました（${st.school.name}・コース ${st.routes.length}件・バス ${st.buses.length}台）。この内容を変更点の比較の基準（現行）にしました`, 6000);
+  } else {
+    closeDialog(); replaceState(st); applyBounds(); fitAll(); toast('読み込みました');
+  }
 });
 function exportDialog() {
   openDialog('書き出し', `
@@ -1468,6 +1748,7 @@ function helpDialog() {
     <li><b>現行時刻</b>：今の時刻表の時刻を、停留所のピンとコース編集の「現行の園着」に入れておくと、計算との差が表示され、⚙設定で計算の速さを今のダイヤに合わせられます。</li>
     <li><b>案の保存</b>：「案A」「案B」のように名前を付けて保存し、切り替えて比べられます。作業内容は自動でこの端末に保存されます。</li>
     <li><b>印刷</b>：時刻表＋ルートマップをコース別にA4印刷・PDF保存できます。バスの電話番号・写真は⚙設定で登録します。</li>
+    <li><b>変更概要・変更詳細</b>：印刷のときに、比較の基準（現行）や保存した案と比べた「新設・廃止・コース変更・場所/名称/順番の変更・時刻の変更」のページを先頭に付けられます。基準は「💾案の保存・読込」で設定します（初期設定でファイルを読み込んだときは、その内容が基準になります）。</li>
     <li><b>iPadで使うとき</b>：ピンは指でドラッグ、地図をタップして停留所追加。左上の「☰」でパネルを隠して地図を広く使えます（縦向きでは押すたびに 標準→大きく→隠す）。持ち合いボードと一覧の並べ替えは、少し長押ししてからドラッグします。</li>
     <li><b>Googleマップ</b>：各コースの「Googleマップで開く」でナビ確認、「書き出し → KML」でGoogleマイマップに取り込めます。</li>
   </ol>
@@ -1532,7 +1813,14 @@ function renderSetup() {
   const steps = `<div class="steps">${['① 園の場所', '② バス', '③ はじめる'].map((t, i) => `<span class="${i + 1 === setup.step ? 'on' : ''}">${t}</span>`).join('')}</div>`;
   if (setup.step === 1) {
     const ok = setup.lat != null;
-    el.innerHTML = `${steps}<h2>はじめに、園の場所を教えてください</h2>
+    el.innerHTML = `${steps}
+      <div class="startfile">
+        <b>📂 保存したデータがある場合</b>
+        <p>以前に「書き出し」や「案の保存・読込」で保存したファイル（.json）を読み込むと、園の場所・バス・コースがそのまま入った状態で始められます。</p>
+        <button class="primary" id="suFile" type="button">ファイルを読み込んで始める</button>
+      </div>
+      <div class="or"><span>または、新しく登録する</span></div>
+      <h2>はじめに、園の場所を教えてください</h2>
       <label class="fld">園の名前<input type="text" id="suName" value="${esc(setup.name)}" placeholder="例：〇〇幼稚園"></label>
       <div class="fld">園の住所で探す<div class="row"><input type="text" id="suQ" placeholder="例：〇〇市〇〇町1-2-3"><button id="suGo">探す</button></div></div>
       <div class="res" id="suRes" hidden></div>
@@ -1542,6 +1830,7 @@ function renderSetup() {
       <div class="privacy">🔒 このアプリのデータ（園の位置・コース・停留所・人数）は、<b>この端末の中だけ</b>に保存されます。<br>地図と道順の計算のために、<b>位置（緯度・経度）と検索した言葉だけ</b>をインターネットに送ります。園児の名前などは送りません。</div>
       <div class="foot"><button class="left" id="suSample">サンプルで試してみる</button><button class="primary" id="suNext" ${ok ? '' : 'disabled'}>次へ →</button></div>`;
     const q = $('#suQ');
+    $('#suFile').onclick = () => $('#fileIn').click();
     $('#suGo').onclick = () => { if (q.value.trim()) setupSearch(q.value.trim()); };
     q.addEventListener('keydown', e => { if (e.key === 'Enter' && q.value.trim()) setupSearch(q.value.trim()); });
     $('#suName').addEventListener('input', e => { setup.name = e.target.value; });
