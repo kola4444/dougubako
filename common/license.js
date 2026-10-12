@@ -32,10 +32,10 @@
   const RENEW_BEFORE = 7 * DAY;          // 期限の何日前から自動更新するか
   const RECHECK_EVERY = DAY;             // 何日おきに契約の状態を確かめるか
   const PLANS = {
-    light: { name: 'ライト', apps: ['marathon'] },
-    standard: { name: 'スタンダード', apps: ['marathon', 'busroute'] },
+    light: { name: 'ライト', apps: ['marathon', 'oyugikai'] },
+    standard: { name: 'スタンダード', apps: ['marathon', 'busroute', 'oyugikai'] },
   };
-  const APP_NAMES = { marathon: 'マラソン大会 表彰状', busroute: 'バスルート計画' };
+  const APP_NAMES = { marathon: 'マラソン大会 表彰状', busroute: 'バスルート計画', oyugikai: 'お遊戯会 立ち位置' };
 
   const ls = {
     get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },

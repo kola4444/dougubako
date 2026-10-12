@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<!-- 安全のための決まり：このアプリは名簿などをどこにも送れない（通信先は自分のサイトだけ） -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="立ち位置">
+<meta name="theme-color" content="#5f3dc4">
+<title>お遊戯会 立ち位置</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<!-- 名簿の読み込み（SheetJS）と PDF 作成（jsPDF）は、どうぐばこのサイトに置いたものを使う -->
+<script src="../vendor/sheetjs/xlsx.full.min.js"></script>
+<script src="../vendor/jspdf/jspdf.umd.min.js"></script>
+<script defer src="../common/license.js"></script>
+<style>
+:root{
+  --bg:#f5f3fa; --panel:#fff; --ink:#22202a; --muted:#6b6878; --line:#e3dfee; --accent:#5f3dc4; --accent-soft:#efeafd;
+  --ok:#2b8a3e; --bad:#c92a2a; --badbg:#fff0f0; --hdr:56px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;-webkit-text-size-adjust:100%}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;min-height:38px}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+button:disabled{opacity:.45;cursor:default}
+input[type=text],select{border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:#fff;font-size:16px;min-height:40px}
+header{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px max(14px,env(safe-area-inset-right)) 8px max(14px,env(safe-area-inset-left));padding-top:max(8px,env(safe-area-inset-top));background:#2b2140;color:#fff}
+header h1{font-size:17px;margin:0 auto 0 0;white-space:nowrap}
+header button{background:#3d3159;border-color:#55487a;color:#fff}
+header button.primary{background:#fff;color:#2b2140;border-color:#fff}
+.boxlink{color:#fff;text-decoration:none;background:#2f7d6b;border-radius:8px;padding:7px 12px;font-weight:700;white-space:nowrap}
+main{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:14px;padding:14px max(14px,env(safe-area-inset-right)) 30px max(14px,env(safe-area-inset-left));align-items:start}
+@media (max-width:1000px){main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:14px}
+.card h2{font-size:15px;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.card h2 .n{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.fld{display:grid;grid-template-columns:110px minmax(0,1fr);gap:8px;align-items:center;margin-top:8px}
+.fld input,.fld select{width:100%}
+.hint{font-size:13px;color:var(--muted);margin:6px 0 0;line-height:1.6}
+.err{background:var(--badbg);color:var(--bad);border-radius:8px;padding:8px 10px;font-size:13px;margin-top:8px}
+.stepper{display:flex;align-items:center;gap:6px}
+.stepper b{min-width:44px;text-align:center;font-size:20px}
+.stepper button{width:44px;font-size:20px;padding:0}
+.names-preview{font-size:13px;color:var(--muted);margin-top:6px}
+details.scnames summary{cursor:pointer;color:var(--accent);font-size:14px;margin-top:10px}
+.scgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-top:8px}
+.scgrid label{display:flex;gap:6px;align-items:center;font-size:13px}
+.scgrid input{flex:1;min-width:0;min-height:34px;font-size:15px}
+/* 選ぶ表 */
+.mwrap{overflow:auto;max-height:70vh;border:1px solid var(--line);border-radius:10px;-webkit-overflow-scrolling:touch}
+table.mx{border-collapse:separate;border-spacing:0;font-size:14px;min-width:100%}
+.mx th,.mx td{border-bottom:1px solid var(--line);padding:0;text-align:center;background:#fff}
+.mx thead th{position:sticky;top:0;z-index:3;background:#f7f5fc;font-size:12px;padding:4px 2px;white-space:nowrap}
+.mx thead th button{min-height:0;padding:3px 6px;font-size:12px;border-radius:6px;width:100%;background:transparent;border:0;font-weight:700}
+.mx thead th small{display:block;color:var(--muted);font-weight:400}
+.mx th.nm,.mx td.nm{position:sticky;left:0;z-index:2;text-align:left;padding:4px 10px;white-space:nowrap;border-right:1px solid var(--line)}
+.mx thead th.nm{z-index:4}
+.mx td.cnt{font-size:12px;color:var(--muted);padding:0 8px;white-space:nowrap}
+.mx tr.zero td.nm{background:#fff4e6}
+.mx tr.zero td.cnt{color:#d9480f;font-weight:700}
+.cell{width:44px;height:40px;border:0;border-radius:0;background:transparent;min-height:0;padding:0;display:grid;place-items:center}
+.cell i{width:24px;height:24px;border-radius:50%;border:2px solid #cfc9de;display:block}
+.cell.on i{background:var(--c);border-color:var(--c);box-shadow:inset 0 0 0 3px #fff}
+.legend{font-size:12px;color:var(--muted);margin-top:8px}
+/* プレビュー */
+.pv{position:sticky;top:calc(var(--hdr) + 14px)}
+@media (max-width:1000px){.pv{position:static}}
+.pager{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.pager b{font-size:16px}
+.canvasbox{background:#d9d5e3;border-radius:10px;padding:10px;display:grid;place-items:center}
+.canvasbox canvas{width:100%;height:auto;max-width:620px;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.18);border-radius:2px}
+.empty{padding:40px 16px;text-align:center;color:var(--muted)}
+/* ダイアログ・お知らせ */
+dialog{border:0;border-radius:16px;padding:0;max-width:520px;width:calc(100% - 32px);box-shadow:0 20px 50px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(0,0,0,.4)}
+.dlg{padding:18px 18px 16px;display:grid;gap:12px}
+.dlg h3{margin:0;font-size:17px}
+.dlg .acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.dlg .list{display:grid;gap:8px}
+.dlg .list button{text-align:left;padding:10px 12px}
+.dlg .list small{display:block;color:var(--muted)}
+#toast{position:fixed;left:50%;bottom:max(20px,env(safe-area-inset-bottom));transform:translateX(-50%);background:#22202a;color:#fff;padding:10px 18px;border-radius:12px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50;max-width:calc(100% - 32px);text-align:center}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <a id="btnBox" class="boxlink" href="../">← どうぐばこ</a>
+  <h1>🎭 お遊戯会 立ち位置</h1>
+  <button id="btnMore" type="button">⋯ データ</button>
+  <button id="btnPdf" class="primary" type="button">PDFを作成</button>
+</header>
+
+<main>
+  <div>
+    <section class="card">
+      <h2><span class="n">1</span>クラスの名簿を読み込む</h2>
+      <div class="row">
+        <button class="primary" id="btnFile" type="button">📂 名簿ファイルを選ぶ</button>
+        <span class="hint" id="fileInfo" style="margin:0">Numbers・Excel・CSV に対応</span>
+      </div>
+      <input type="file" id="fileIn" hidden accept=".numbers,.xlsx,.xls,.xlsm,.csv,.ods,application/vnd.apple.numbers,application/x-iwork-numbers-sffnumbers,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv">
+      <div id="classBox" hidden>
+        <div class="fld"><span>クラスを選ぶ</span><select id="classSel"></select></div>
+        <div class="names-preview" id="classPreview"></div>
+      </div>
+      <div id="loadErr"></div>
+      <p class="hint">名簿は、この端末の中だけで使われます。インターネットには送られません。</p>
+    </section>
+
+    <section class="card">
+      <h2><span class="n">2</span>お遊戯会の情報</h2>
+      <div class="fld"><span>クラス名</span><input type="text" id="className" placeholder="例：ひまわり組"></div>
+      <div class="fld"><span>タイトル（任意）</span><input type="text" id="title" placeholder="例：大きなかぶ"></div>
+      <div class="fld"><span>場面の数</span>
+        <div class="stepper"><button type="button" id="scMinus">−</button><b id="scCount">5</b><button type="button" id="scPlus">＋</button></div></div>
+      <details class="scnames"><summary>場面ごとの名前をつける（任意）</summary><div class="scgrid" id="scNames"></div></details>
+    </section>
+
+    <section class="card">
+      <h2><span class="n">3</span>場面ごとに、ステージに立つ子を選ぶ</h2>
+      <div id="matrixBox"><div class="empty">先に、1 でクラスの名簿を読み込んでください。</div></div>
+      <p class="legend">● をタップして選びます。同じ子を何回でも選べます。場面の見出しを押すと「全員を選ぶ／全員はずす」ができます。<br>オレンジ色の行は、まだどの場面にも入っていない子です。</p>
+    </section>
+  </div>
+
+  <div class="pv">
+    <section class="card">
+      <h2>できあがりの見本（PDFと同じ）</h2>
+      <div class="pager"><button type="button" id="pvPrev">◀ 前の場面</button><b id="pvLabel">—</b><button type="button" id="pvNext">次の場面 ▶</button></div>
+      <div class="canvasbox"><canvas id="pv" width="840" height="1188"></canvas></div>
+      <p class="hint">場面ごとに、ステージ・音響待機1・待機2・待機3に誰が並ぶかを自動で並べます。<br>2回以上出る子は、次に出る場面の待機場所に並びます。出番が終わった子は、列のいちばん後ろに並びます。</p>
+    </section>
+  </div>
+</main>
+
+<dialog id="dlg"></dialog>
+<input type="file" id="jsonIn" hidden accept=".json,application/json,text/plain">
+<div id="toast" role="status"></div>
+
+<script>
+'use strict';
+/* ============================================================
+   基本設定・保存（データはこの端末の中だけ）
+   ============================================================ */
+const NS = 'dougubako.oyugikai.';
+const LS_CUR = NS + 'current.v1';
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => 'c' + Math.random().toString(36).slice(2, 10);
+// 場面ごとの色（白黒で印刷しても文字で区別できるように、必ず「場面○」の文字も付ける）
+const SCENE_COLORS = ['#e8590c', '#1971c2', '#2f9e44', '#ae3ec9', '#f08c00', '#0c8599', '#c2255c', '#5c940d', '#6741d9', '#e03131', '#3b5bdb', '#087f5b'];
+const sceneColor = j => SCENE_COLORS[(j - 1) % SCENE_COLORS.length];
+const MAX_SCENES = 30;
+
+function blank() { return { version: 1, className: '', title: '', sceneCount: 5, sceneNames: [], roster: [], sel: {} }; }
+let state;
+try { state = JSON.parse(localStorage.getItem(LS_CUR)) || blank(); } catch (e) { state = blank(); }
+state = { ...blank(), ...state };
+let pvScene = 1;
+let lastBook = null;   // 読み込んだ名簿（クラスの候補）
+function save() { try { localStorage.setItem(LS_CUR, JSON.stringify(state)); } catch (e) { } }
+
+let toastT;
+function toast(msg, ms = 2800) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), ms); }
+
+/* ============================================================
+   名簿の読み込み（Numbers / Excel / CSV）
+   ・1つのファイルに複数のクラスが入っていても選べるようにする
+     - シート（タブ）や表ごとにクラスが分かれている
+     - 「クラス」「組」の列でクラスが分かれている
+     - 列の見出しがクラス名（例：ひまわり組・さくら組）になっている
+   ============================================================ */
+const NAME_RE = /氏名|名前|なまえ|園児名|児童名|生徒名|^name/i;
+const KANA_RE = /ふりがな|フリガナ|よみ|かな|カナ/;
+const CLASS_COL_RE = /^(クラス|クラス名|組|組名|学級|class)$/i;
+const CLASS_NAME_RE = /組|ぐみ|クラス|class/i;
+const isNum = v => typeof v === 'number' || /^\s*[0-9０-９]+(\.[0-9]+)?\s*(位|番)?\s*$/.test(String(v));
+const clean = v => String(v ?? '').replace(/\s+/g, ' ').trim();
+
+function readClasses(wb) {
+  const out = [];
+  wb.SheetNames.forEach(sn => {
+    const base = sn.replace(/_\d+$/, '');
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '', blankrows: false, raw: true });
+    const h = rows.findIndex(r => r.some(v => clean(v)));
+    if (h < 0) return;
+    const head = rows[h].map(clean);
+    const body = rows.slice(h + 1);
+    const width = Math.max(...rows.map(r => r.length));
+    const colVals = c => body.map(r => clean(r[c]));
+    const textCol = c => { const v = colVals(c).filter(Boolean); return v.length && v.filter(isNum).length / v.length < 0.5; };
+    // 名前の列（漢字の名前 → ふりがな → 文字の列の順で探す）
+    let ni = head.findIndex((x, c) => NAME_RE.test(x) && !KANA_RE.test(x) && textCol(c));
+    if (ni < 0) ni = head.findIndex((x, c) => KANA_RE.test(x) && textCol(c));
+    const ci = head.findIndex((x, c) => CLASS_COL_RE.test(x) && c !== ni);
+    if (ni >= 0 && ci >= 0) {
+      // 「クラス」の列で分かれている
+      const groups = new Map();
+      body.forEach(r => { const n = clean(r[ni]); if (!n) return; const k = clean(r[ci]) || '（クラスなし）'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(n); });
+      groups.forEach((names, k) => out.push({ label: k, names, from: sn }));
+      return;
+    }
+    // 列の見出しがクラス名になっている（例：ひまわり組｜さくら組）
+    const classCols = [];
+    for (let c = 0; c < width; c++) if (CLASS_NAME_RE.test(head[c]) && !NAME_RE.test(head[c]) && !KANA_RE.test(head[c]) && textCol(c)) classCols.push(c);
+    if (classCols.length) { classCols.forEach(c => out.push({ label: head[c], names: colVals(c).filter(Boolean), from: sn })); return; }
+    // ふつうの名簿（シートや表ごとに1クラス）
+    if (ni < 0) for (let c = 0; c < width; c++) if (textCol(c)) { ni = c; break; }
+    if (ni < 0) return;
+    const names = colVals(ni).filter(Boolean);
+    if (names.length) out.push({ label: base, names, from: sn });
+  });
+  // 同じ名前の候補がならぶときは、区別できるように番号をつける
+  const seen = {};
+  out.forEach(o => { seen[o.label] = (seen[o.label] || 0) + 1; if (seen[o.label] > 1) o.label += `（${seen[o.label]}）`; });
+  return out;
+}
+async function loadRosterFile(file) {
+  $('loadErr').innerHTML = '';
+  try {
+    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    const classes = readClasses(wb);
+    if (!classes.length) throw new Error('名前の列が見つかりませんでした');
+    const fileBase = file.name.replace(/\.[^.]+$/, '');
+    if (classes.length === 1 && !CLASS_NAME_RE.test(classes[0].label) && CLASS_NAME_RE.test(fileBase)) classes[0].label = fileBase;
+    lastBook = { file: file.name, classes };
+    $('fileInfo').textContent = '📄 ' + file.name;
+    const sel = $('classSel');
+    sel.innerHTML = '<option value="">（クラスを選んでください）</option>' + classes.map((c, i) => `<option value="${i}">${esc(c.label)}（${c.names.length}人）</option>`).join('');
+    $('classBox').hidden = false;
+    if (classes.length === 1) { sel.value = '0'; applyClass(0); }
+    else { $('classPreview').textContent = `${classes.length}クラス分の名簿が見つかりました。使うクラスを選んでください。`; sel.focus(); }
+  } catch (e) {
+    console.error(e);
+    $('loadErr').innerHTML = `<div class="err">名簿を読み込めませんでした。1行目に「名前」や「ふりがな」の見出しがある表にしてください。（${esc(e.message || e)}）</div>`;
+  }
+}
+function applyClass(i) {
+  const c = lastBook && lastBook.classes[i]; if (!c) return;
+  const doIt = () => {
+    // 同じ名前の子がいれば選んだ内容を引き継ぐ（名簿を読み直したとき用）
+    const byName = new Map(state.roster.map(r => [r.name, r.id]));
+    const roster = c.names.map(n => ({ id: byName.get(n) || uid(), name: n }));
+    const keep = new Set(roster.map(r => r.id));
+    const sel = {}; for (const [id, sc] of Object.entries(state.sel)) if (keep.has(id)) sel[id] = sc;
+    state.roster = roster; state.sel = sel;
+    if (!state.className || state.className === state._autoClass) { state.className = c.label; state._autoClass = c.label; }
+    save(); renderAll();
+    $('classPreview').textContent = `${c.label}：${c.names.length}人（${c.names.slice(0, 4).join('、')}${c.names.length > 4 ? ' …' : ''}）`;
+    toast(`${c.label}（${c.names.length}人）を読み込みました`);
+  };
+  if (state.roster.length && Object.keys(state.sel).length && !sameNames(state.roster.map(r => r.name), c.names)) {
+    confirmDlg('名簿を入れ替えますか？', '今の名簿で選んだ内容のうち、新しい名簿にいない子の選択は消えます。', '入れ替える', doIt);
+  } else doIt();
+}
+const sameNames = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+
+/* ============================================================
+   並び方の計算
+   ・場面 k のページ：ステージ＝場面 k の子
+   ・その後ろの並び＝これからの場面（k+1 … 最後）→ 出番が終わった子（場面1 … k−1）の順にぐるっと並ぶ
+     いちばん前が「音響待機1」、残り（場面数−2 のグループ）を半分に分けて、前半が待機2・後半が待機3
+   ・2回以上出る子は、次に出る場面のグループに並ぶ（若い場面の待機場所）
+   ・出番が全部終わった子は、最後に出た場面の「おわった子」のグループに並ぶ
+   ============================================================ */
+function appearances(id) { return (state.sel[id] || []).filter(j => j >= 1 && j <= state.sceneCount).sort((a, b) => a - b); }
+function membersOf(j) { return state.roster.filter(r => appearances(r.id).includes(j)).map(r => r.id); }
+function pageModel(k) {
+  const N = state.sceneCount;
+  const stage = membersOf(k);
+  const onStage = new Set(stage);
+  const up = {}, done = {};
+  for (let j = 1; j <= N; j++) { up[j] = []; done[j] = []; }
+  for (const r of state.roster) {
+    const ap = appearances(r.id); if (!ap.length || onStage.has(r.id)) continue;
+    const next = ap.find(j => j > k);
+    if (next) up[next].push(r.id);
+    else { const last = [...ap].reverse().find(j => j < k); if (last) done[last].push(r.id); }
+  }
+  // ステージの子の「次の出番」
+  const after = {}; for (const id of stage) after[id] = appearances(id).find(j => j > k) || 0;
+  // ぐるっと並んだ順番（グループの枠）
+  const ring = [];
+  for (let j = k + 1; j <= N; j++) ring.push({ kind: 'up', scene: j, ids: up[j] });
+  for (let j = 1; j < k; j++) ring.push({ kind: 'done', scene: j, ids: done[j] });
+  const w1 = ring.length ? ring[0] : null;
+  const rest = ring.slice(1);
+  const half = Math.ceil(rest.length / 2);
+  const cont = w1 && w1.kind === 'up' ? stage.filter(id => after[id] === w1.scene) : [];
+  return { k, N, stage, after, w1, cont, w2: rest.slice(0, half), w3: rest.slice(half) };
+}
+const nameOf = id => (state.roster.find(r => r.id === id) || {}).name || '';
+const sceneLabel = j => `場面${j}` + (state.sceneNames[j - 1] ? `「${state.sceneNames[j - 1]}」` : '');
+
+/* ============================================================
+   ページの絵（プレビューとPDFで同じものを使う）A4縦
+   ============================================================ */
+const FONT = '"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",sans-serif';
+function drawPage(cv, k) {
+  const W = cv.width, H = cv.height, mm = W / 210;
+  const ctx = cv.getContext('2d');
+  ctx.save(); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+  ctx.textBaseline = 'alphabetic';
+  const m = pageModel(k);
+  const f = (px, w = 400) => `${w} ${px}px ${FONT}`;
+  const text = (s, x, y, size, opt = {}) => {
+    ctx.font = f(size * mm, opt.w || 400); ctx.fillStyle = opt.c || '#111'; ctx.textAlign = opt.a || 'left';
+    let sz = size;
+    if (opt.max) { while (ctx.measureText(s).width > opt.max * mm && sz > 2) { sz -= 0.2; ctx.font = f(sz * mm, opt.w || 400); } }
+    ctx.fillText(s, x * mm, y * mm);
+    return ctx.measureText(s).width / mm;
+  };
+  const rrect = (x, y, w, h, r, fill, stroke, lw) => {
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x * mm, y * mm, w * mm, h * mm, r * mm) : ctx.rect(x * mm, y * mm, w * mm, h * mm);
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = (lw || 0.3) * mm; ctx.stroke(); }
+  };
+  const arrow = (x1, y1, x2, y2, lw, head) => {
+    ctx.strokeStyle = '#111'; ctx.fillStyle = '#111'; ctx.lineWidth = lw * mm; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1 * mm, y1 * mm); ctx.lineTo(x2 * mm, y2 * mm); ctx.stroke();
+    const a = Math.atan2(y2 - y1, x2 - x1);
+    ctx.beginPath(); ctx.moveTo(x2 * mm + Math.cos(a) * head * 0.4 * mm, y2 * mm + Math.sin(a) * head * 0.4 * mm);
+    ctx.lineTo(x2 * mm - Math.cos(a - 0.5) * head * mm, y2 * mm - Math.sin(a - 0.5) * head * mm);
+    ctx.lineTo(x2 * mm - Math.cos(a + 0.5) * head * mm, y2 * mm - Math.sin(a + 0.5) * head * mm); ctx.closePath(); ctx.fill();
+  };
+
+  // ---- 上の見出し：クラス名・タイトル・場面 ----
+  const L = 12, R = 198;
+  let x = text(state.className || 'クラス名', L, 17, 7.5, { w: 700, max: 80 });
+  if (state.title) text(state.title, L + x + 5, 17, 6, { w: 400, c: '#333', max: R - L - x - 8 });
+  rrect(L, 22, 30, 11.5, 2.5, '#111');
+  text(`場面 ${k}`, L + 15, 30.3, 6.6, { w: 700, c: '#fff', a: 'center' });
+  x = text(`／ 全${m.N}場面`, L + 33, 30.3, 4.6, { c: '#333' });
+  if (state.sceneNames[k - 1]) text(`「${state.sceneNames[k - 1]}」`, L + 33 + x + 2, 30.5, 6, { w: 700, max: R - (L + 35 + x) });
+  const cnt = ids => ids.length, sumG = gs => gs.reduce((a, g) => a + g.ids.length, 0);
+  text(`ステージ ${cnt(m.stage)}人　音響待機1 ${m.w1 ? m.w1.ids.length : 0}人　待機2 ${sumG(m.w2)}人　待機3 ${sumG(m.w3)}人`, R, 30.3, 3.3, { a: 'right', c: '#555' });
+
+  // ---- ステージ全体の枠 ----
+  const X0 = 12, Y0 = 38, BW = 186, BH = 246;
+  ctx.strokeStyle = '#111'; ctx.lineWidth = 0.9 * mm; ctx.strokeRect(X0 * mm, Y0 * mm, BW * mm, BH * mm);
+  const col = (a, b) => ({ x: X0 + BW * a, w: BW * (b - a) });
+  const C3 = col(0.015, 0.225), C2 = col(0.235, 0.445), WALL = X0 + BW * 0.46, C1 = col(0.475, 0.665), ST = col(0.68, 0.985);
+  const topY = Y0 + 22, botY = Y0 + BH - 4;
+  // 中央の壁
+  ctx.lineWidth = 0.7 * mm; ctx.beginPath(); ctx.moveTo(WALL * mm, (Y0 + 16) * mm); ctx.lineTo(WALL * mm, (Y0 + BH) * mm); ctx.stroke();
+  text('壁', WALL - 1.6, Y0 + BH - 3, 2.8, { c: '#666', a: 'right' });
+  // 階段（後ろの待機列 → 音響待機1）
+  text('階段', (C2.x + C1.x + C1.w) / 2 - 18, Y0 + 7, 4.2, { w: 700, a: 'center' });
+  arrow(C2.x + C2.w * 0.2, Y0 + 11, C1.x + C1.w * 0.75, Y0 + 11, 2.2, 5);
+  // 舞台の枠
+  rrect(ST.x, Y0 + 16, ST.w, BH - 20, 0, '#fbfaff', '#111', 0.5);
+
+  // ---- 文字の大きさ：いちばん長い列に合わせて、全部の列を同じ大きさにそろえる ----
+  const lines = gs => gs.reduce((a, g) => a + (g.ids.length ? g.ids.length + 1.85 : (g.kind === 'up' ? 1.85 : 0)), 0);
+  const w1g = m.w1 ? [m.w1] : [];
+  const contLines = m.cont.length ? 1 + Math.ceil(m.cont.length / 3) : 0;
+  const colH = botY - (topY + 9);
+  const need = Math.max(lines(m.w2), lines(m.w3), lines(w1g) + contLines * 0.9, 1);
+  const stageNeed = m.stage.length > 16 ? Math.ceil(m.stage.length / 2) + 2 : m.stage.length + 2;
+  const lh = Math.min(8.2, colH / Math.max(need, stageNeed * 0.9, 1));
+  const fs = Math.max(2.4, Math.min(4.9, lh * 0.62));
+
+  const chip = (g, x, y, w) => {
+    const isDone = g.kind === 'done';
+    const label = isDone ? `場面${g.scene}でおわった子` : sceneLabel(g.scene) + (g.ids.length ? `（${g.ids.length}人）` : '（なし）');
+    rrect(x, y - lh * 0.95, w, lh * 1.12, 1.2, isDone ? '#e9ecef' : sceneColor(g.scene));
+    text(label, x + 1.6, y - lh * 0.17, fs * 0.82, { w: 700, c: isDone ? '#495057' : '#fff', max: w - 3 });
+  };
+  const nameRow = (id, g, x, y, w, extra, size = fs) => {
+    const isDone = g && g.kind === 'done';
+    if (g && !isDone) rrect(x, y - lh * 0.82, 1.2, lh * 0.95, 0.4, sceneColor(g.scene));
+    let ew = 0;
+    if (extra) { ctx.font = f(size * 0.6 * mm, 700); ew = ctx.measureText(extra).width / mm + 1.5; }
+    text(nameOf(id), x + 3, y, size, { w: isDone ? 400 : 500, c: isDone ? '#777' : '#111', max: w - 4 - ew });
+    if (extra) text(extra, x + w - 0.5, y, size * 0.6, { c: '#5f3dc4', a: 'right', w: 700 });
+  };
+  // 長い文を、幅に合わせて何行かに分ける
+  const wrap = (str, width, size) => {
+    ctx.font = f(size * mm, 400); const out = []; let line = '';
+    for (const ch of str) { if (ctx.measureText(line + ch).width / mm > width && line) { out.push(line); line = ch; } else line += ch; }
+    if (line) out.push(line); return out;
+  };
+  // 待機2・待機3（先頭は上）
+  const queueDown = (gs, C, label) => {
+    text(label, C.x + 1, Y0 + 20, 4.4, { w: 700 });
+    text('（先頭 ↑）', C.x + C.w - 0.5, Y0 + 20, 2.9, { a: 'right', c: '#555' });
+    ctx.strokeStyle = '#bbb'; ctx.lineWidth = 0.25 * mm; ctx.beginPath(); ctx.moveTo(C.x * mm, (Y0 + 22) * mm); ctx.lineTo((C.x + C.w) * mm, (Y0 + 22) * mm); ctx.stroke();
+    let y = topY + 6;
+    let first = true;
+    for (const g of gs) {
+      if (!g.ids.length && g.kind === 'done') continue;
+      if (!first) y += lh * 0.45;
+      first = false;
+      chip(g, C.x, y, C.w); y += lh * 1.4;
+      for (const id of g.ids) { nameRow(id, g, C.x, y, C.w); y += lh; }
+    }
+  };
+  queueDown(m.w3, C3, '待機3');
+  queueDown(m.w2, C2, '待機2');
+  // 音響待機1（先頭は下。下からステージへ進む）
+  text('音響待機1', C1.x + 1, Y0 + 20, 4.4, { w: 700 });
+  {
+    let y = botY - 9;
+    text('先頭 ↓', C1.x + 1, botY - 1.5, 3.2, { w: 700 });
+    arrow(C1.x + 15, botY - 2.6, ST.x - 1.5, botY - 2.6, 0.8, 2.4);
+    if (m.w1) {
+      const g = m.w1;
+      if (g.kind === 'done' && !g.ids.length) { /* 何もいない */ }
+      else {
+        // 先頭（いちばん下）から上へ
+        for (const id of g.ids) { nameRow(id, g, C1.x, y, C1.w); y -= lh; }
+        chip(g, C1.x, y + lh * 0.1, C1.w); y -= lh * 1.6;
+      }
+      if (m.cont.length) {
+        const sz = Math.max(2.6, fs * 0.72);
+        const ls = wrap(m.cont.map(nameOf).join('、'), C1.w - 1.5, sz);
+        for (const l of ls.reverse()) { text(l, C1.x + 0.5, y, sz, { c: '#333' }); y -= sz * 1.35; }
+        text('ステージから続けて出る子：', C1.x + 0.5, y, sz, { c: '#333', w: 700, max: C1.w - 1 });
+      }
+    }
+  }
+  // ステージ（今の場面の子）
+  {
+    const g = { kind: 'up', scene: k, ids: m.stage };
+    text('ステージ', ST.x + ST.w / 2, Y0 + 24, 5.2, { w: 700, a: 'center' });
+    let y = Y0 + 33;
+    rrect(ST.x + 2, y - lh * 0.95, ST.w - 4, lh * 1.12, 1.2, sceneColor(k));
+    text(`${sceneLabel(k)}に出る子（${m.stage.length}人）`, ST.x + 3.5, y - lh * 0.17, fs * 0.82, { w: 700, c: '#fff', max: ST.w - 7 });
+    y += lh * 1.45;
+    const two = m.stage.length > 18;
+    const per = two ? Math.ceil(m.stage.length / 2) : m.stage.length;
+    const cw = two ? (ST.w - 4) / 2 : ST.w - 4;
+    const slh = Math.min(8.2, Math.max(lh, (Y0 + BH - 8 - y) / Math.max(per, 1)));
+    const sfs = Math.max(2.4, Math.min(two ? 4.2 : 4.9, slh * 0.62));
+    m.stage.forEach((id, i) => {
+      const cx = ST.x + 2 + (two && i >= per ? cw : 0), cy = y + (two && i >= per ? i - per : i) * slh;
+      const nx = m.after[id];
+      nameRow(id, g, cx, cy, cw - 1, nx ? `つぎ→場面${nx}` : '', sfs);
+    });
+    if (!m.stage.length) text('（この場面に出る子がまだ選ばれていません）', ST.x + ST.w / 2, y + 4, 3.2, { a: 'center', c: '#c92a2a', max: ST.w - 4 });
+  }
+  // ---- 下のメモ ----
+  text(`ステージの子の「つぎ→場面○」は、この場面のあと次に出る場面（その待機場所へ並ぶ）。書いていない子は、この場面で出番がおわり。`, X0, Y0 + BH + 5.5, 2.7, { c: '#555', max: BW - 30 });
+  text(`${k} / ${m.N}`, X0 + BW, Y0 + BH + 5.5, 3.2, { a: 'right', c: '#555' });
+  ctx.restore();
+}
+
+/* ============================================================
+   画面の表示
+   ============================================================ */
+function renderAll() {
+  $('className').value = state.className || '';
+  $('title').value = state.title || '';
+  $('scCount').textContent = state.sceneCount;
+  renderSceneNames(); renderMatrix(); renderPreview();
+}
+function renderSceneNames() {
+  $('scNames').innerHTML = Array.from({ length: state.sceneCount }, (_, i) => `<label>場面${i + 1}<input type="text" data-sn="${i}" value="${esc(state.sceneNames[i] || '')}" placeholder="（なし）"></label>`).join('');
+  $('scNames').querySelectorAll('[data-sn]').forEach(inp => inp.addEventListener('input', () => { state.sceneNames[+inp.dataset.sn] = inp.value.trim(); save(); renderMatrixHead(); renderPreview(); }));
+}
+function renderMatrix() {
+  const box = $('matrixBox');
+  if (!state.roster.length) { box.innerHTML = '<div class="empty">先に、1 でクラスの名簿を読み込んでください。</div>'; return; }
+  const N = state.sceneCount;
+  let h = `<div class="mwrap"><table class="mx"><thead><tr><th class="nm">名前</th>`;
+  for (let j = 1; j <= N; j++) h += `<th data-hj="${j}"></th>`;
+  h += `<th>回数</th></tr></thead><tbody>`;
+  for (const r of state.roster) {
+    const ap = appearances(r.id);
+    h += `<tr class="${ap.length ? '' : 'zero'}" data-rid="${r.id}"><td class="nm">${esc(r.name)}</td>`;
+    for (let j = 1; j <= N; j++) h += `<td><button type="button" class="cell ${ap.includes(j) ? 'on' : ''}" style="--c:${sceneColor(j)}" data-id="${r.id}" data-j="${j}" aria-label="${esc(r.name)} 場面${j}"><i></i></button></td>`;
+    h += `<td class="cnt">${ap.length ? ap.length + '回' : 'なし'}</td></tr>`;
+  }
+  h += `</tbody></table></div>`;
+  box.innerHTML = h;
+  renderMatrixHead();
+  box.querySelectorAll('.cell').forEach(b => b.addEventListener('click', () => toggle(b.dataset.id, +b.dataset.j, b)));
+}
+function renderMatrixHead() {
+  document.querySelectorAll('[data-hj]').forEach(th => {
+    const j = +th.dataset.hj;
+    th.innerHTML = `<button type="button" style="color:${sceneColor(j)}">場面${j}</button><small>${membersOf(j).length}人${state.sceneNames[j - 1] ? '・' + esc(state.sceneNames[j - 1]) : ''}</small>`;
+    th.querySelector('button').onclick = () => sceneMenu(j);
+  });
+}
+function toggle(id, j, btn) {
+  const cur = new Set(state.sel[id] || []);
+  cur.has(j) ? cur.delete(j) : cur.add(j);
+  state.sel[id] = [...cur].sort((a, b) => a - b);
+  if (!state.sel[id].length) delete state.sel[id];
+  save();
+  btn.classList.toggle('on', cur.has(j));
+  const tr = btn.closest('tr'); const ap = appearances(id);
+  tr.classList.toggle('zero', !ap.length); tr.querySelector('.cnt').textContent = ap.length ? ap.length + '回' : 'なし';
+  renderMatrixHead();
+  pvScene = j; renderPreview();
+}
+function sceneMenu(j) {
+  openDlg(`<div class="dlg"><h3>${esc(sceneLabel(j))}</h3>
+    <div class="list"><button type="button" id="smAll">全員を選ぶ<small>クラス全員がこの場面に出ます（最後のあいさつなど）</small></button>
+    <button type="button" id="smNone">全員はずす</button>
+    <button type="button" id="smView">この場面の見本を見る</button></div>
+    <div class="acts"><button type="button" data-close>閉じる</button></div></div>`);
+  $('smAll').onclick = () => { for (const r of state.roster) { const s = new Set(state.sel[r.id] || []); s.add(j); state.sel[r.id] = [...s].sort((a, b) => a - b); } save(); closeDlg(); pvScene = j; renderMatrix(); renderPreview(); };
+  $('smNone').onclick = () => { for (const r of state.roster) { if (!state.sel[r.id]) continue; state.sel[r.id] = state.sel[r.id].filter(x => x !== j); if (!state.sel[r.id].length) delete state.sel[r.id]; } save(); closeDlg(); renderMatrix(); renderPreview(); };
+  $('smView').onclick = () => { closeDlg(); pvScene = j; renderPreview(); document.querySelector('.pv').scrollIntoView({ behavior: 'smooth' }); };
+}
+function renderPreview() {
+  const N = state.sceneCount;
+  pvScene = Math.min(Math.max(1, pvScene), N);
+  $('pvLabel').textContent = `場面${pvScene} ／ 全${N}場面`;
+  $('pvPrev').disabled = pvScene <= 1; $('pvNext').disabled = pvScene >= N;
+  drawPage($('pv'), pvScene);
+}
+
+/* ============================================================
+   PDF の作成（A4縦・場面ごとに1ページ）
+   ============================================================ */
+async function makePdf() {
+  if (!state.roster.length) { toast('先に名簿を読み込んでください'); return; }
+  const empty = []; for (let j = 1; j <= state.sceneCount; j++) if (!membersOf(j).length) empty.push(j);
+  if (empty.length) toast(`場面${empty.join('・')}は、出る子がまだ選ばれていません`, 3500);
+  toast('PDFを作成しています…', 6000);
+  await (document.fonts && document.fonts.ready);
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+  const cv = document.createElement('canvas'); cv.width = 1654; cv.height = 2339;   // 約200dpi
+  for (let k = 1; k <= state.sceneCount; k++) {
+    if (k > 1) pdf.addPage('a4', 'portrait');
+    drawPage(cv, k);
+    pdf.addImage(cv.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+    await new Promise(r => setTimeout(r, 0));
+  }
+  const name = `立ち位置_${state.className || 'クラス'}${state.title ? '_' + state.title : ''}.pdf`.replace(/[\\/:*?"<>|]/g, '');
+  const blob = pdf.output('blob');
+  const url = URL.createObjectURL(blob);
+  const file = new File([blob], name, { type: 'application/pdf' });
+  const canShare = navigator.canShare && navigator.canShare({ files: [file] });
+  openDlg(`<div class="dlg"><h3>PDFができました</h3>
+    <p style="margin:0">${esc(name)}（${state.sceneCount}ページ）</p>
+    <div class="list">
+      ${canShare ? '<button type="button" id="pdShare">📤 保存・共有・印刷する<small>「ファイルに保存」や「プリント」を選べます</small></button>' : ''}
+      <button type="button" id="pdOpen">📄 PDFを開く</button>
+      <a id="pdDl" href="${url}" download="${esc(name)}" style="text-decoration:none"><button type="button" style="width:100%;text-align:left">⬇ PDFをダウンロード</button></a>
+    </div>
+    <div class="acts"><button type="button" data-close>閉じる</button></div></div>`);
+  $('pdShare')?.addEventListener('click', () => navigator.share({ files: [file], title: name }).catch(() => {}));
+  $('pdOpen').onclick = () => window.open(url, '_blank');
+}
+
+/* ============================================================
+   データ（この端末の中）：書き出し・読み込み・消す
+   ============================================================ */
+function dataMenu() {
+  openDlg(`<div class="dlg"><h3>データ</h3>
+    <p class="hint" style="margin:0">作業中の内容は、この端末の中に自動で保存されています。別のiPadで続きをするときは、ファイルに書き出して読み込みます。</p>
+    <div class="list">
+      <button type="button" id="dmExp">⬇ ファイルに書き出す（.json）<small>名簿・場面・選んだ内容がすべて入ります（園児の名前が入るので扱いに注意）</small></button>
+      <button type="button" id="dmImp">📂 ファイルから読み込む</button>
+      <button type="button" id="dmClear" style="color:var(--bad)">🗑 この端末からデータを消す<small>名簿と選んだ内容をすべて消して、最初からにします</small></button>
+    </div>
+    <div class="acts"><button type="button" data-close>閉じる</button></div></div>`);
+  $('dmExp').onclick = () => {
+    const name = `立ち位置データ_${state.className || 'クラス'}${state.title ? '_' + state.title : ''}.json`.replace(/[\\/:*?"<>|]/g, '');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(state, null, 1)], { type: 'application/json' })); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 3000); closeDlg();
+  };
+  $('dmImp').onclick = () => { closeDlg(); $('jsonIn').click(); };
+  $('dmClear').onclick = () => confirmDlg('この端末からデータを消しますか？', '名簿・場面・選んだ内容がすべて消えます。元に戻せません。', '消す', () => {
+    try { Object.keys(localStorage).filter(k => k.startsWith(NS)).forEach(k => localStorage.removeItem(k)); } catch (e) { }
+    state = blank(); lastBook = null; $('classBox').hidden = true; $('fileInfo').textContent = 'Numbers・Excel・CSV に対応'; renderAll(); toast('消しました');
+  });
+}
+$('jsonIn').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const s = JSON.parse(await f.text());
+    if (!Array.isArray(s.roster) || typeof s.sel !== 'object') throw 0;
+    state = { ...blank(), ...s, sceneCount: Math.min(MAX_SCENES, Math.max(1, +s.sceneCount || 1)) };
+    save(); renderAll(); toast('読み込みました');
+  } catch (err) { toast('このファイルは読み込めませんでした'); }
+});
+
+/* ---------- ダイアログ ---------- */
+function openDlg(html) { const d = $('dlg'); d.innerHTML = html; d.querySelectorAll('[data-close]').forEach(b => b.onclick = closeDlg); if (!d.open) d.showModal(); }
+function closeDlg() { const d = $('dlg'); if (d.open) d.close(); }
+function confirmDlg(title, body, okLabel, fn) {
+  openDlg(`<div class="dlg"><h3>${esc(title)}</h3><p style="margin:0">${esc(body)}</p><div class="acts"><button type="button" data-close>やめる</button><button type="button" class="primary" id="cfOk">${esc(okLabel)}</button></div></div>`);
+  $('cfOk').onclick = () => { closeDlg(); fn(); };
+}
+$('dlg').addEventListener('click', e => { if (e.target === $('dlg')) closeDlg(); });
+
+/* ---------- 操作 ---------- */
+$('btnFile').onclick = () => $('fileIn').click();
+$('fileIn').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) loadRosterFile(f); });
+$('classSel').addEventListener('change', e => { if (e.target.value !== '') applyClass(+e.target.value); });
+$('className').addEventListener('input', e => { state.className = e.target.value; save(); renderPreview(); });
+$('title').addEventListener('input', e => { state.title = e.target.value; save(); renderPreview(); });
+const setCount = n => { n = Math.min(MAX_SCENES, Math.max(1, n)); if (n === state.sceneCount) return; state.sceneCount = n; save(); renderSceneNames(); renderMatrix(); renderPreview(); };
+$('scMinus').onclick = () => {
+  const n = state.sceneCount - 1; if (n < 1) return;
+  const used = state.roster.some(r => (state.sel[r.id] || []).includes(state.sceneCount));
+  if (used) confirmDlg(`場面${state.sceneCount}を減らしますか？`, `場面${state.sceneCount}で選んだ内容は使われなくなります（場面を増やし直すと戻ります）。`, '減らす', () => setCount(n));
+  else setCount(n);
+};
+$('scPlus').onclick = () => setCount(state.sceneCount + 1);
+$('pvPrev').onclick = () => { pvScene--; renderPreview(); };
+$('pvNext').onclick = () => { pvScene++; renderPreview(); };
+$('btnPdf').onclick = makePdf;
+$('btnMore').onclick = dataMenu;
+
+/* ---------- 起動 ---------- */
+renderAll();
+if (document.fonts) document.fonts.ready.then(renderPreview);
+document.addEventListener('DOMContentLoaded', () => { if (window.DouguLicense) window.DouguLicense.guardApp('oyugikai', '../'); });
+// オフライン対応：どうぐばこ共通の仕組み（sw.js）に登録。保存したデータが自動で消されにくくする
+if (/^https?:$/.test(location.protocol)) {
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(() => {});
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+}
+</script>
+</body>
+</html>

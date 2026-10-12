@@ -1297,7 +1297,11 @@ function exportKML() {
   k += `</Document></kml>`;
   download(`バスルート_${state.name}.kml`, k, 'application/vnd.google-earth.kml+xml');
 }
-function exportJSON() { download(`バスルート案_${state.name}.json`, JSON.stringify(state, null, 1), 'application/json'); }
+// 案のデータ（バスの写真も一緒に入れる。別の端末で読み込むと写真も引き継がれる）
+function exportJSON() {
+  const ph = {}; for (const b of state.buses) if (photos[b.id]) ph[b.id] = photos[b.id];
+  download(`バスルート案_${state.name}.json`, JSON.stringify({ ...state, photos: ph }, null, 1), 'application/json');
+}
 
 /* ============================================================
    比較ページ（変更概要・変更詳細）
@@ -1622,6 +1626,7 @@ function scenarioDialog() {
 function normalizeImported(s) {
   if (!s || typeof s !== 'object' || !Array.isArray(s.routes) || !s.school || !isFinite(+s.school.lat) || !isFinite(+s.school.lng)) throw new Error('bad file');
   const st = { ...blankState(), ...s };
+  delete st.photos;   // バスの写真は案とは別に保存する（下の読み込み処理で取り込む）
   st.name = s.name || '読み込んだ案';
   // 園名が入っていない（または「幼稚園」だけの）ファイルは、明青幼稚園として読み込む
   const nm = (s.school.name || '').trim();
@@ -1642,12 +1647,18 @@ function normalizeImported(s) {
 }
 $('#fileIn').addEventListener('change', async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-  let st;
-  try { st = normalizeImported(JSON.parse(await f.text())); }
+  let st, raw;
+  try { raw = JSON.parse(await f.text()); st = normalizeImported(raw); }
   catch (err) {
     if (setup.active) toast('このファイルは読み込めませんでした。バスルート計画の「書き出し」や「案の保存」で保存した .json ファイルを選んでください', 6000);
     else alert('このファイルは読み込めませんでした');
     return;
+  }
+  // ファイルにバスの写真が入っていれば、この端末に保存する（印刷のルートマップに使う）
+  let nPhotos = 0;
+  if (raw.photos && typeof raw.photos === 'object') {
+    for (const [id, src] of Object.entries(raw.photos)) if (typeof src === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(src) && st.buses.some(b => b.id === id)) { photos[id] = src; nPhotos++; }
+    if (nPhotos) savePhotos().catch(() => {});
   }
   if (setup.active) {
     // 初期設定の画面から：読み込んだ内容でそのまま始める

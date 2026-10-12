@@ -9,7 +9,7 @@
 
    アプリを更新したら、下の VERSION を変えると、古い保存分が入れ替わる
    ============================================================ */
-const VERSION = '2026-10-11-6';
+const VERSION = '2026-10-12-2';
 const CACHE = 'dougubako-' + VERSION;
 
 // 最初に保存しておくもの（どうぐばこを一度開けば、ネットがなくても各アプリが開けるように）
@@ -32,6 +32,9 @@ const CORE = [
   './vendor/leaflet/images/marker-icon-2x.png',
   './vendor/leaflet/images/marker-shadow.png',
   './vendor/sortable/Sortable.min.js',
+  './oyugikai/',
+  './vendor/sheetjs/xlsx.full.min.js',
+  './vendor/jspdf/jspdf.umd.min.js',
 ];
 
 self.addEventListener('install', e => {
