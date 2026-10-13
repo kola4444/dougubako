@@ -2,431 +2,627 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<!-- 安全のための決まり：このページは自分のサイト以外と通信しない -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<!-- 安全のための決まり：このアプリは名簿などをどこにも送れない（通信先は自分のサイトだけ） -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="どうぐばこ">
-<meta name="theme-color" content="#2f7d6b">
-<title>どうぐばこ</title>
-<link rel="apple-touch-icon" href="icon.png">
-<link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="manifest" href="manifest.webmanifest">
-<script defer src="common/license.js"></script>
+<meta name="apple-mobile-web-app-title" content="立ち位置">
+<meta name="theme-color" content="#2b2140">
+<title>お遊戯会 立ち位置</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<!-- 名簿の読み込み（SheetJS）と PDF 作成（jsPDF）は、どうぐばこのサイトに置いたものを使う -->
+<script src="../vendor/sheetjs/xlsx.full.min.js"></script>
+<script src="../vendor/jspdf/jspdf.umd.min.js"></script>
+<script defer src="../common/license.js"></script>
 <style>
-/* 見出しの書体（どうぐばこの画面で使う文字だけの小さな版。サイトに置いてあり、オフラインでも使える） */
-@font-face{font-family:"Zen Maru Gothic Box";font-weight:500;font-display:swap;src:url(fonts/ZenMaruGothic-box-500.woff2) format("woff2")}
-@font-face{font-family:"Zen Maru Gothic Box";font-weight:700;font-display:swap;src:url(fonts/ZenMaruGothic-box-700.woff2) format("woff2")}
 :root{
-  --bg:#eef3f1; --surface:#ffffff; --ink:#1f2a2e; --muted:#5d6c70; --line:#d9e3df;
-  --accent:#2f7d6b; --accent-ink:#ffffff; --accent-soft:#e0f0ea; --net:#b45309;
-  --bad:#c92a2a; --bad-soft:#fdecec; --warn:#9a5b00; --warn-soft:#fff4dc;
-  --c-shou:#d47a24; --c-jimu:#5f8a34; --c-wait:#a9b4b7; --demo:#6741d9; --demo-soft:#efeafd;
-  --f-disp:"Zen Maru Gothic Box","Hiragino Maru Gothic ProN","Hiragino Sans",sans-serif;
-  --f-body:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,system-ui,sans-serif;
+  --bg:#f5f3fa; --panel:#fff; --ink:#22202a; --muted:#6b6878; --line:#e3dfee; --accent:#5f3dc4; --accent-soft:#efeafd;
+  --bad:#c92a2a; --badbg:#fff0f0; --warn:#d9480f; --warnbg:#fff4e6; --hdr:56px;
 }
-@media (prefers-color-scheme: dark){:root{
-  --bg:#131a1c; --surface:#1c2427; --ink:#e7eeec; --muted:#9aa9ad; --line:#2b3538;
-  --accent:#5db8a1; --accent-ink:#0f1f1b; --accent-soft:#1f3631; --net:#f0a35e;
-  --bad:#ff8787; --bad-soft:#3a1f1f; --warn:#f0b35e; --warn-soft:#3a2e17;
-  --c-shou:#e39446; --c-jimu:#82ad55; --c-wait:#4d585b; --demo:#b197fc; --demo-soft:#2a2340; color-scheme:dark}}
 *{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 var(--f-body);min-height:100vh;
-  padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(90px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
-button,input{font:inherit;color:inherit}
-.wrap{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;-webkit-text-size-adjust:100%}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;min-height:40px}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+button:disabled{opacity:.45;cursor:default}
+input[type=text],select{border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:#fff;font-size:16px;min-height:42px}
+header{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px max(14px,env(safe-area-inset-right)) 8px max(14px,env(safe-area-inset-left));padding-top:max(8px,env(safe-area-inset-top));background:#2b2140;color:#fff}
+header h1{font-size:17px;margin:0 auto 0 0;white-space:nowrap}
+header button{background:#3d3159;border-color:#55487a;color:#fff}
+header button.primary{background:#fff;color:#2b2140;border-color:#fff}
+.boxlink{color:#fff;text-decoration:none;background:#2f7d6b;border-radius:8px;padding:8px 12px;font-weight:700;white-space:nowrap}
+main{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px;padding:14px max(14px,env(safe-area-inset-right)) 30px max(14px,env(safe-area-inset-left));align-items:start}
+@media (max-width:1050px){main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:14px}
+.card h2{font-size:15px;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.card h2 .n{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;flex:none}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.fld{display:grid;grid-template-columns:120px minmax(0,1fr);gap:8px;align-items:center;margin-top:8px}
+.fld input,.fld select{width:100%}
+.hint{font-size:13px;color:var(--muted);margin:6px 0 0;line-height:1.6}
+.err{background:var(--badbg);color:var(--bad);border-radius:8px;padding:8px 10px;font-size:13px;margin-top:8px}
+.stepper{display:flex;align-items:center;gap:8px}
+.stepper b{min-width:48px;text-align:center;font-size:22px}
+.stepper button{width:48px;font-size:22px;padding:0}
+details.scnames summary{cursor:pointer;color:var(--accent);font-size:14px;margin-top:10px}
+.scgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px;margin-top:8px}
+.scgrid label{display:flex;gap:6px;align-items:center;font-size:13px;white-space:nowrap}
+.scgrid input{flex:1;min-width:0;min-height:36px;font-size:15px}
+.empty{padding:30px 16px;text-align:center;color:var(--muted)}
 
-/* ---- 共通：中央のカード（ログインなど） ---- */
-.center{min-height:calc(100vh - 120px);display:grid;place-items:center}
-.card{width:100%;max-width:420px;background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:28px 24px;display:flex;flex-direction:column;gap:14px;box-shadow:0 10px 30px rgba(0,0,0,.06)}
-.card .logo{width:84px;height:84px;border-radius:21px;display:block;margin:0 auto 2px}
-.card h1{margin:0;text-align:center;font:700 1.4rem/1.3 var(--f-disp)}
-.card h2{margin:0;text-align:center;font:700 1.15rem/1.4 var(--f-disp)}
-.card p{margin:0;font-size:.88rem;color:var(--muted);text-align:center;line-height:1.7}
-.fld{display:flex;flex-direction:column;gap:4px;font-size:.85rem;font-weight:600}
-.fld input{width:100%;font-size:16px;font-weight:400;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
-.fld input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-.code{letter-spacing:.5em;text-align:center;font-size:24px!important;font-variant-numeric:tabular-nums}
-.btn{border:0;border-radius:999px;padding:12px 20px;font-weight:700;cursor:pointer;background:var(--accent);color:var(--accent-ink);font-size:1rem}
-.btn:disabled{opacity:.5;cursor:default}
-.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
-.btn:focus-visible,.linkbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.linkbtn{background:none;border:0;color:var(--accent);cursor:pointer;font-size:.85rem;padding:2px;text-decoration:underline}
-.err{background:var(--bad-soft);color:var(--bad);border-radius:10px;padding:9px 12px;font-size:.85rem}
-.check{display:flex;gap:8px;align-items:flex-start;font-size:.85rem;color:var(--muted)}
-.check input{margin-top:4px;width:18px;height:18px;flex:none}
-.note{font-size:.78rem;color:var(--muted);line-height:1.7;background:var(--accent-soft);border-radius:12px;padding:10px 12px}
-.demohint{font-size:.8rem;background:var(--demo-soft);color:var(--demo);border-radius:12px;padding:10px 12px;line-height:1.7}
-.demohint b{font-variant-numeric:tabular-nums}
-.demohint .accts{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-.demohint button{border:1px solid var(--demo);background:var(--surface);color:var(--demo);border-radius:999px;padding:3px 10px;font-size:.78rem;cursor:pointer}
+/* 場面のタブ */
+.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;-webkit-overflow-scrolling:touch}
+.tabs button{flex:none;border-radius:999px;padding:4px 14px;min-height:40px;line-height:1.2}
+.tabs button small{display:block;font-size:11px;color:var(--muted)}
+.tabs button.on{background:#2b2140;border-color:#2b2140;color:#fff}
+.tabs button.on small{color:#cfc6e8}
+.tools{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.tools button{font-size:13px;min-height:36px;padding:4px 10px}
 
-/* ---- 許可証を受け取る ---- */
-.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
-.steps li{display:flex;gap:10px;align-items:center;font-size:.92rem;color:var(--muted)}
-.steps li i{width:24px;height:24px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-style:normal;font-size:.8rem;flex:none}
-.steps li.doing{color:var(--ink)}
-.steps li.doing i{border-color:var(--accent);border-top-color:transparent;animation:spin .8s linear infinite}
-.steps li.done{color:var(--ink)}
-.steps li.done i{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-@keyframes spin{to{transform:rotate(360deg)}}
-.pass{border:1px solid var(--line);border-radius:16px;padding:14px 16px;display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:.88rem}
-.pass dt{color:var(--muted)}
-.pass dd{margin:0;font-weight:600}
-.big-ok{width:56px;height:56px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-size:1.8rem;margin:0 auto}
-.big-ng{width:56px;height:56px;border-radius:50%;background:var(--bad-soft);color:var(--bad);display:grid;place-items:center;font-size:1.7rem;margin:0 auto}
+/* 並ぶ場所（ボックス） */
+.boxes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+@media (max-width:700px){.boxes{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.pbox,.pbox ol,.pbox li{min-width:0}
+.pbox{border:2px solid var(--line);border-radius:12px;background:#fff;display:flex;flex-direction:column;min-height:170px;cursor:pointer}
+.pbox.on{border-color:var(--c);box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 25%,transparent)}
+.pbox .ph{background:var(--c);color:#fff;border-radius:9px 9px 0 0;padding:6px 8px;font-weight:700;font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:4px}
+.pbox .ph small{font-weight:400;font-size:11px;opacity:.9}
+.pbox .pnote{font-size:11px;color:var(--muted);padding:3px 8px 0}
+.pbox ol{list-style:none;margin:0;padding:4px 6px 8px;display:grid;gap:3px}
+.pbox li{display:flex;align-items:center;gap:4px;font-size:13px;border:1px solid var(--line);border-radius:7px;padding:2px 2px 2px 6px;background:#fff}
+.pbox li .no{color:var(--muted);font-size:11px;min-width:16px}
+.pbox li .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pbox li button{flex:none;min-height:28px;min-width:26px;padding:0;border:0;background:#f3f1f8;border-radius:6px;font-size:12px}
+.pbox .here{margin:auto 8px 8px;font-size:12px;text-align:center;color:var(--c);font-weight:700}
+.pbox:not(.on) .here{color:var(--muted);font-weight:400}
 
-/* ---- メニュー ---- */
-.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.top img{width:52px;height:52px;border-radius:13px;flex:none;display:block}
-.top .ttl{margin-right:auto}
-.top h1{margin:0;font:700 1.45rem/1.2 var(--f-disp)}
-.top p{margin:2px 0 0;font-size:.8rem;color:var(--muted)}
-.chip{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px 6px 8px;cursor:pointer;font-size:.8rem;text-align:left;line-height:1.3}
-.chip .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);flex:none}
-.chip.warn .dot{background:var(--warn)}
-.chip small{display:block;color:var(--muted);font-size:.72rem}
-section{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px 18px 18px}
-section h2{margin:0 0 12px;font:700 1rem var(--f-disp);display:flex;align-items:baseline;gap:8px}
-section h2 small{font:400 .76rem var(--f-body);color:var(--muted)}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:16px 8px}
-.app{display:flex;flex-direction:column;align-items:center;gap:6px;text-decoration:none;color:var(--ink);background:none;border:0;padding:4px 0;font:inherit;cursor:pointer;border-radius:12px;position:relative}
-.app:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.app .tile{width:66px;height:66px;border-radius:17px;display:grid;place-items:center;color:#fff;transition:transform .15s}
-.app .tile svg{width:46px;height:46px;display:block}
-.app:hover .tile{transform:translateY(-2px)}
-.app > span:last-child{font-size:.78rem;line-height:1.3;text-align:center}
-.app .net{position:absolute;top:-4px;right:calc(50% - 44px);background:var(--net);color:#fff;font-size:.58rem;font-weight:700;padding:1px 6px;border-radius:999px;font-style:normal}
-.app .lock{position:absolute;top:-6px;left:calc(50% - 42px);font-size:.95rem;font-style:normal}
-.app.locked .tile{background:var(--c-wait)!important}
-.app.soon .tile{background:var(--c-wait)}
-.app.soon > span:last-child{color:var(--muted)}
-.app .badge{position:absolute;top:-5px;right:calc(50% - 46px);background:var(--muted);color:var(--surface);font-size:.58rem;font-weight:700;padding:1px 6px;border-radius:999px;font-style:normal}
-.app.locked > span:last-child{color:var(--muted)}
-.legend{margin:12px 0 0;font-size:.76rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 14px}
-.legend i{display:inline-block;background:var(--net);color:#fff;font-style:normal;font-size:.6rem;font-weight:700;padding:0 6px;border-radius:999px;margin-right:4px;vertical-align:1px}
-.privacy{background:var(--accent-soft);border-radius:14px;padding:12px 16px;font-size:.84rem;line-height:1.7}
-.privacy b{color:var(--accent)}
+/* 名簿から選ぶ */
+.picker{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px}
+.picker .ptitle{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px}
+.picker .ptitle b{color:var(--active)}
+.names{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:6px;margin-top:8px}
+.names button{text-align:left;padding:5px 8px;min-height:44px;line-height:1.25;position:relative}
+.names button .tag{display:block;font-size:11px;color:#fff;background:var(--c);border-radius:4px;padding:0 5px;width:max-content;margin-top:2px}
+.names button.placed{background:#faf9fd}
+.names button.here{border:2px solid var(--c);background:color-mix(in srgb,var(--c) 10%,#fff)}
+.left{background:var(--warnbg);color:var(--warn);border-radius:8px;padding:6px 10px;font-size:13px;margin-top:8px}
+.left.ok{background:#ebfbee;color:#2b8a3e}
+.chk{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.chk input{width:18px;height:18px}
 
-/* ---- ダイアログ・お知らせ ---- */
-dialog{border:0;border-radius:20px;padding:0;max-width:440px;width:calc(100% - 32px);background:var(--surface);color:var(--ink);box-shadow:0 20px 50px rgba(0,0,0,.3)}
+/* プレビュー */
+.pv{position:sticky;top:calc(var(--hdr) + 14px)}
+@media (max-width:1050px){.pv{position:static}}
+.pager{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.pager b{font-size:16px}
+.canvasbox{background:#d9d5e3;border-radius:10px;padding:10px;display:grid;place-items:center}
+.canvasbox canvas{width:100%;height:auto;max-width:620px;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.18);border-radius:2px}
+
+/* ダイアログ・お知らせ */
+dialog{border:0;border-radius:16px;padding:0;max-width:520px;width:calc(100% - 32px);box-shadow:0 20px 50px rgba(0,0,0,.3)}
 dialog::backdrop{background:rgba(0,0,0,.4)}
-.dlg{padding:22px 20px;display:flex;flex-direction:column;gap:12px}
-.dlg h3{margin:0;font:700 1.1rem var(--f-disp)}
-.dlg .row{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
-#toast{position:fixed;left:50%;bottom:max(84px,calc(env(safe-area-inset-bottom) + 70px));transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:10px 18px;border-radius:14px;font-size:.85rem;opacity:0;transition:opacity .2s;pointer-events:none;max-width:calc(100% - 32px);text-align:center;z-index:50}
+.dlg{padding:18px 18px 16px;display:grid;gap:12px}
+.dlg h3{margin:0;font-size:17px}
+.dlg .acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.dlg .list{display:grid;gap:8px}
+.dlg .list button{text-align:left;padding:10px 12px}
+.dlg .list small{display:block;color:var(--muted)}
+#toast{position:fixed;left:50%;bottom:max(20px,env(safe-area-inset-bottom));transform:translateX(-50%);background:#22202a;color:#fff;padding:10px 18px;border-radius:12px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50;max-width:calc(100% - 32px);text-align:center}
 #toast.show{opacity:1}
-.offbar{position:sticky;top:0;z-index:20;background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:6px 12px;font-size:.8rem;text-align:center;margin:0 auto 12px;max-width:980px}
-
-/* ---- 試作の体験メニュー ---- */
-#demoBtn[hidden]{display:none}
-#demoBtn{position:fixed;right:max(16px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom));z-index:40;background:var(--demo);color:#fff;border:0;border-radius:999px;padding:11px 16px;font-weight:700;font-size:.85rem;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.2)}
-.demo h3{color:var(--demo)}
-.demo p{margin:0;font-size:.8rem;color:var(--muted);line-height:1.6}
-.demo .grp{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:6px}
-.demo .grp b{font-size:.85rem}
-.demo .acts{display:flex;flex-wrap:wrap;gap:6px}
-.demo .acts button{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:6px 12px;font-size:.8rem;cursor:pointer}
-.demo .acts button.on{background:var(--demo);color:#fff;border-color:var(--demo)}
-.demo .now{font-size:.78rem;background:var(--demo-soft);border-radius:10px;padding:8px 10px;line-height:1.7}
-@media (prefers-reduced-motion:reduce){.tile{transition:none}.steps li.doing i{animation:none}}
 </style>
 </head>
 <body>
-<div id="offbar" class="offbar" hidden>📴 ネットを切った状態を再現しています（体験メニューで戻せます）</div>
-<main id="screen"></main>
-<button id="demoBtn" type="button" hidden>🧪 試作の体験メニュー</button>
+<header>
+  <a id="btnBox" class="boxlink" href="../">← どうぐばこ</a>
+  <h1>🎭 お遊戯会 立ち位置</h1>
+  <button id="btnMore" type="button">⋯ データ</button>
+  <button id="btnPdf" class="primary" type="button">PDFを作成</button>
+</header>
+
+<main>
+  <div>
+    <section class="card">
+      <h2><span class="n">1</span>クラスの名簿を読み込む</h2>
+      <div class="row">
+        <button class="primary" id="btnFile" type="button">📂 名簿ファイルを選ぶ</button>
+        <span class="hint" id="fileInfo" style="margin:0">Numbers・Excel・CSV に対応</span>
+      </div>
+      <input type="file" id="fileIn" hidden accept=".numbers,.xlsx,.xls,.xlsm,.csv,.ods,application/vnd.apple.numbers,application/x-iwork-numbers-sffnumbers,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv">
+      <div id="classBox" hidden>
+        <div class="fld"><span>クラスを選ぶ</span><select id="classSel"></select></div>
+        <div class="hint" id="classPreview"></div>
+      </div>
+      <div id="loadErr"></div>
+      <p class="hint">名簿は、この端末の中だけで使われます。インターネットには送られません。</p>
+    </section>
+
+    <section class="card">
+      <h2><span class="n">2</span>お遊戯会の情報</h2>
+      <div class="fld"><span>クラス名</span><input type="text" id="className" placeholder="例：ひまわり組"></div>
+      <div class="fld"><span>タイトル（任意）</span><input type="text" id="title" placeholder="例：大きなかぶ"></div>
+      <div class="fld"><span>場面の数</span>
+        <div class="stepper"><button type="button" id="scMinus" aria-label="場面を減らす">−</button><b id="scCount">5</b><button type="button" id="scPlus" aria-label="場面を増やす">＋</button></div></div>
+      <details class="scnames"><summary>場面ごとの名前をつける（任意）</summary><div class="scgrid" id="scNames"></div></details>
+    </section>
+
+    <section class="card">
+      <h2><span class="n">3</span>場面ごとに、並ぶ場所へ子を入れる</h2>
+      <div id="editor"><div class="empty">先に、1 でクラスの名簿を読み込んでください。</div></div>
+    </section>
+  </div>
+
+  <div class="pv">
+    <section class="card">
+      <h2>できあがりの見本（PDFと同じ）</h2>
+      <div class="pager"><button type="button" id="pvPrev">◀ 前の場面</button><b id="pvLabel">—</b><button type="button" id="pvNext">次の場面 ▶</button></div>
+      <div class="canvasbox"><canvas id="pv" width="840" height="1188"></canvas></div>
+    </section>
+  </div>
+</main>
+
 <dialog id="dlg"></dialog>
+<input type="file" id="jsonIn" hidden accept=".json,application/json,text/plain">
 <div id="toast" role="status"></div>
 
 <script>
 'use strict';
-let L = null; // 共通部品（common/license.js）が読み込まれてから入る
-const $ = s => document.querySelector(s);
+/* ============================================================
+   基本設定・保存（データはこの端末の中だけ）
+   ============================================================ */
+const NS = 'dougubako.oyugikai.';
+const LS_CUR = NS + 'current.v2';
+const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const fmtDate = t => new Date(t).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
-const fmtDT = t => new Date(t).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-const daysLeft = pl => Math.max(0, Math.ceil((pl.exp - Date.now()) / L.DAY));
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+const uid = () => 'c' + Math.random().toString(36).slice(2, 10);
+const MAX_SCENES = 30;
+// 並ぶ場所（図の左から順）。色は画面とPDFで同じ
+const POS = [
+  { key: 'w3', label: '待機3', color: '#2f9e44', note: '後ろの待機列（先頭は上）' },
+  { key: 'w2', label: '待機2', color: '#1971c2', note: '後ろの待機列（先頭は上）' },
+  { key: 'w1', label: '音響待機1', color: '#e8590c', note: '階段を上がった先（先頭は下）' },
+  { key: 'stage', label: 'ステージ', color: '#7048e8', note: '今の場面で舞台に立つ子' },
+];
+const POSMAP = Object.fromEntries(POS.map(p => [p.key, p]));
+
+function blank() { return { version: 2, className: '', title: '', sceneCount: 5, sceneNames: [], roster: [], scenes: {}, cur: 1 }; }
+let state;
+try { state = JSON.parse(localStorage.getItem(LS_CUR)) || blank(); } catch (e) { state = blank(); }
+state = { ...blank(), ...state };
+let active = 'stage';        // 今、名前を入れる場所
+let onlyLeft = false;        // まだ入っていない子だけ表示
+let lastBook = null;         // 読み込んだ名簿（クラスの候補）
+function save() { try { localStorage.setItem(LS_CUR, JSON.stringify(state)); } catch (e) { } }
+
 let toastT;
-function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), ms); }
-function show(html) { $('#screen').innerHTML = html; $('#offbar').hidden = !(L.loginRequired && L.isOffline()); window.scrollTo(0, 0); }
-const ERR = {
-  bad_login: 'メールアドレスかパスワードが違います。',
-  ended: 'この園のご契約は終了しています。園の管理者にお問い合わせください。',
-  stopped: 'このアカウントは利用が停止されています。園の管理者にお問い合わせください。',
-  offline: 'インターネットにつながっていません。つながる場所でもう一度お試しください。',
-  bad_code: '確認コードが違います。メールに書かれた6けたの数字を入れてください。',
-  expired_code: '確認コードの有効期限が切れました。もう一度ログインしてください。',
-};
+function toast(msg, ms = 2800) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), ms); }
+
+/* ---------- 場面ごとの並び ---------- */
+function scene(k) {
+  const s = state.scenes[k] || (state.scenes[k] = {});
+  for (const p of POS) if (!Array.isArray(s[p.key])) s[p.key] = [];
+  return s;
+}
+function posOf(k, id) { const s = scene(k); for (const p of POS) if (s[p.key].includes(id)) return p.key; return null; }
+// その場面で、子を場所に入れる（別の場所にいれば移す。同じ場所にいれば外す）
+function assign(k, id, key) {
+  const s = scene(k); const was = posOf(k, id);
+  if (was) s[was] = s[was].filter(x => x !== id);
+  if (was !== key) s[key].push(id);
+  save();
+}
+const nameOf = id => (state.roster.find(r => r.id === id) || {}).name || '';
+const placedCount = k => { const s = scene(k); return POS.reduce((a, p) => a + s[p.key].filter(id => nameOf(id)).length, 0); };
+const sceneLabel = j => `場面${j}` + (state.sceneNames[j - 1] ? `「${state.sceneNames[j - 1]}」` : '');
 
 /* ============================================================
-   起動：どうぐばこを開いたとき
-   ・許可証が有効 → すぐメニュー（必要なら裏で更新）
-   ・許可証がない → ログイン
-   ・期限切れ → 更新を試す（ネットがなければ案内）
+   名簿の読み込み（Numbers / Excel / CSV）
+   ・Numbers の表の名前（例：ひまわり組）を、クラス名として表示する
+   ・1つのファイルに複数のクラスが入っていても選べる
+     - 表やシート（タブ）ごとにクラスが分かれている
+     - 「クラス」「組」の列でクラスが分かれている
+     - 列の見出しがクラス名（例：ひまわり組｜さくら組）
    ============================================================ */
-async function boot() {
-  // ログインなしで使う設定（common/license.js の LOGIN_REQUIRED = false）のときは、すぐメニューを出す
-  $('#demoBtn').hidden = !L.loginRequired;
-  if (!L.loginRequired) {
-    // 体験メニューを出さないので、以前の「ネットを切った状態の再現」が残っていたら解除する
-    try { L.demo && L.demo.setOffline(false); } catch (e) { }
-    return showMenu(L.profile || { orgName: '明青幼稚園', staff: '', plan: 'standard', apps: ['marathon', 'busroute', 'oyugikai'] });
+const NAME_RE = /氏名|名前|なまえ|園児名|児童名|生徒名|^name/i;
+const KANA_RE = /ふりがな|フリガナ|よみ|かな|カナ/;
+const CLASS_COL_RE = /^(クラス|クラス名|組|組名|学級|class)$/i;
+const CLASS_NAME_RE = /組|ぐみ|クラス|class/i;
+const DEFAULT_TABLE_RE = /^(表|テーブル|table)\s*\d+([-‐－]\d+)?$/i;
+const isNum = v => typeof v === 'number' || /^\s*[0-9０-９]+(\.[0-9]+)?\s*(位|番)?\s*$/.test(String(v));
+const clean = v => String(v ?? '').replace(/\s+/g, ' ').trim();
+
+function readClasses(wb, fileBase) {
+  const out = [];
+  wb.SheetNames.forEach(sn => {
+    const ws = wb.Sheets[sn];
+    const base = sn.replace(/_\d+$/, '');
+    const tname = clean(ws['!tableName']);
+    // 表の名前が付いていれば、それをクラス名にする（「表1」のような初めからの名前は使わない）
+    const label0 = tname && !DEFAULT_TABLE_RE.test(tname) ? tname : base;
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', blankrows: false, raw: true });
+    const h = rows.findIndex(r => r.some(v => clean(v)));
+    if (h < 0) return;
+    const head = rows[h].map(clean);
+    const body = rows.slice(h + 1);
+    const width = Math.max(...rows.map(r => r.length));
+    const colVals = c => body.map(r => clean(r[c]));
+    const textCol = c => { const v = colVals(c).filter(Boolean); return v.length && v.filter(isNum).length / v.length < 0.5; };
+    let ni = head.findIndex((x, c) => NAME_RE.test(x) && !KANA_RE.test(x) && textCol(c));
+    if (ni < 0) ni = head.findIndex((x, c) => KANA_RE.test(x) && textCol(c));
+    const ci = head.findIndex((x, c) => CLASS_COL_RE.test(x) && c !== ni);
+    if (ni >= 0 && ci >= 0) {
+      const groups = new Map();
+      body.forEach(r => { const n = clean(r[ni]); if (!n) return; const k = clean(r[ci]) || '（クラスなし）'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(n); });
+      groups.forEach((names, k) => out.push({ label: k, names }));
+      return;
+    }
+    const classCols = [];
+    for (let c = 0; c < width; c++) if (CLASS_NAME_RE.test(head[c]) && !NAME_RE.test(head[c]) && !KANA_RE.test(head[c]) && textCol(c)) classCols.push(c);
+    if (classCols.length) { classCols.forEach(c => out.push({ label: head[c], names: colVals(c).filter(Boolean) })); return; }
+    if (ni < 0) for (let c = 0; c < width; c++) if (textCol(c)) { ni = c; break; }
+    if (ni < 0) return;
+    const names = colVals(ni).filter(Boolean);
+    if (names.length) out.push({ label: label0, names });
+  });
+  if (out.length === 1 && !CLASS_NAME_RE.test(out[0].label) && CLASS_NAME_RE.test(fileBase)) out[0].label = fileBase;
+  const seen = {};
+  out.forEach(o => { seen[o.label] = (seen[o.label] || 0) + 1; if (seen[o.label] > 1) o.label += `（${seen[o.label]}）`; });
+  return out;
+}
+async function loadRosterFile(file) {
+  $('loadErr').innerHTML = '';
+  try {
+    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    const classes = readClasses(wb, file.name.replace(/\.[^.]+$/, ''));
+    if (!classes.length) throw new Error('名前の列が見つかりませんでした');
+    lastBook = { file: file.name, classes };
+    $('fileInfo').textContent = '📄 ' + file.name;
+    const sel = $('classSel');
+    sel.innerHTML = '<option value="">（クラスを選んでください）</option>' + classes.map((c, i) => `<option value="${i}">${esc(c.label)}（${c.names.length}人）</option>`).join('');
+    $('classBox').hidden = false;
+    if (classes.length === 1) { sel.value = '0'; applyClass(0); }
+    else { $('classPreview').textContent = `${classes.length}クラス分の名簿が見つかりました。使うクラスを選んでください。`; sel.focus(); }
+  } catch (e) {
+    console.error(e);
+    $('loadErr').innerHTML = `<div class="err">名簿を読み込めませんでした。1行目に「名前」や「ふりがな」の見出しがある表にしてください。（${esc(e.message || e)}）</div>`;
   }
-  const st = await L.status();
-  if (st.state === 'none' || st.state === 'bad') { if (st.state === 'bad') L.logout(); return showLogin(st.state === 'bad' ? '利用許可証を確認できなかったため、ログインし直してください。' : ''); }
-  if (st.state === 'expired') {
-    show(`<div class="center"><div class="card"><img class="logo" src="icon.svg" alt=""><h2>利用許可証を更新しています…</h2></div></div>`);
-    const r = await L.renew();
-    if (r.result === 'ok') { toast('利用許可証を更新しました'); return showMenu(r.payload); }
-    return showBlocked(r.result, st.payload);
+}
+function applyClass(i) {
+  const c = lastBook && lastBook.classes[i]; if (!c) return;
+  const doIt = () => {
+    // 同じ名前の子がいれば、入れた場所を引き継ぐ（名簿を読み直したとき用）
+    const byName = new Map(state.roster.map(r => [r.name, r.id]));
+    state.roster = c.names.map(n => ({ id: byName.get(n) || uid(), name: n }));
+    const keep = new Set(state.roster.map(r => r.id));
+    for (const k of Object.keys(state.scenes)) { const s = scene(k); for (const p of POS) s[p.key] = s[p.key].filter(id => keep.has(id)); }
+    if (!state.className || state.className === state._autoClass) { state.className = c.label; state._autoClass = c.label; }
+    save(); renderAll();
+    $('classPreview').textContent = `${c.label}：${c.names.length}人（${c.names.slice(0, 4).join('、')}${c.names.length > 4 ? ' …' : ''}）`;
+    toast(`${c.label}（${c.names.length}人）を読み込みました`);
+  };
+  const hasWork = Object.keys(state.scenes).some(k => placedCount(k));
+  if (state.roster.length && hasWork && !sameNames(state.roster.map(r => r.name), c.names)) {
+    confirmDlg('名簿を入れ替えますか？', '今の名簿で入れた子のうち、新しい名簿にいない子は、並ぶ場所から外れます。', '入れ替える', doIt);
+  } else doIt();
+}
+const sameNames = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+
+/* ============================================================
+   ページの絵（プレビューとPDFで同じものを使う）A4縦
+   ============================================================ */
+const FONT = '"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",sans-serif';
+function drawPage(cv, k) {
+  const W = cv.width, H = cv.height, mm = W / 210;
+  const ctx = cv.getContext('2d');
+  ctx.save(); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+  const s = scene(k);
+  const list = key => s[key].filter(id => nameOf(id));
+  const f = (px, w = 400) => `${w} ${px}px ${FONT}`;
+  const text = (str, x, y, size, opt = {}) => {
+    ctx.font = f(size * mm, opt.w || 400); ctx.fillStyle = opt.c || '#111'; ctx.textAlign = opt.a || 'left';
+    if (opt.max) { let sz = size; while (ctx.measureText(str).width > opt.max * mm && sz > 2) { sz -= 0.2; ctx.font = f(sz * mm, opt.w || 400); } }
+    ctx.fillText(str, x * mm, y * mm);
+    return ctx.measureText(str).width / mm;
+  };
+  const rect = (x, y, w, h, fill, stroke, lw, r = 0) => {
+    ctx.beginPath(); if (r && ctx.roundRect) ctx.roundRect(x * mm, y * mm, w * mm, h * mm, r * mm); else ctx.rect(x * mm, y * mm, w * mm, h * mm);
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = (lw || 0.3) * mm; ctx.stroke(); }
+  };
+  const arrow = (x1, y1, x2, y2, lw, head) => {
+    ctx.strokeStyle = '#111'; ctx.fillStyle = '#111'; ctx.lineWidth = lw * mm; ctx.lineCap = 'butt';
+    const a = Math.atan2(y2 - y1, x2 - x1);
+    ctx.beginPath(); ctx.moveTo(x1 * mm, y1 * mm); ctx.lineTo((x2 - Math.cos(a) * head * 0.8) * mm, (y2 - Math.sin(a) * head * 0.8) * mm); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x2 * mm, y2 * mm);
+    ctx.lineTo((x2 - Math.cos(a - 0.45) * head) * mm, (y2 - Math.sin(a - 0.45) * head) * mm);
+    ctx.lineTo((x2 - Math.cos(a + 0.45) * head) * mm, (y2 - Math.sin(a + 0.45) * head) * mm); ctx.closePath(); ctx.fill();
+  };
+
+  // ---- 上の見出し：クラス名・タイトル・場面 ----
+  const L = 12, R = 198;
+  let x = text(state.className || 'クラス名', L, 17, 7.5, { w: 700, max: 80 });
+  if (state.title) text(state.title, L + x + 5, 17, 6, { c: '#333', max: R - L - x - 8 });
+  rect(L, 22, 30, 11.5, '#111', null, 0, 2.5);
+  text(`場面 ${k}`, L + 15, 30.3, 6.6, { w: 700, c: '#fff', a: 'center' });
+  x = text(`／ 全${state.sceneCount}場面`, L + 33, 30.3, 4.6, { c: '#333' });
+  if (state.sceneNames[k - 1]) text(`「${state.sceneNames[k - 1]}」`, L + 33 + x + 2, 30.5, 6, { w: 700, max: R - (L + 37 + x) - 58 });
+  text(POS.slice().reverse().map(p => `${p.label} ${list(p.key).length}人`).join('　'), R, 30.3, 3.2, { a: 'right', c: '#555' });
+
+  // ---- ステージ全体の枠・中央の壁・階段 ----
+  const X0 = 12, Y0 = 38, BW = 186, BH = 246;
+  ctx.strokeStyle = '#111'; ctx.lineWidth = 0.9 * mm; ctx.strokeRect(X0 * mm, Y0 * mm, BW * mm, BH * mm);
+  const col = (a, b) => ({ x: X0 + BW * a, w: BW * (b - a) });
+  const C = { w3: col(0.015, 0.225), w2: col(0.235, 0.445), w1: col(0.475, 0.665), stage: col(0.68, 0.985) };
+  const WALL = X0 + BW * 0.46;
+  ctx.lineWidth = 0.7 * mm; ctx.beginPath(); ctx.moveTo(WALL * mm, (Y0 + 16) * mm); ctx.lineTo(WALL * mm, (Y0 + BH) * mm); ctx.stroke();
+  text('壁', WALL - 1.6, Y0 + BH - 3, 2.8, { c: '#666', a: 'right' });
+  text('階段', (C.w2.x + C.w1.x + C.w1.w) / 2 - 18, Y0 + 7, 4.2, { w: 700, a: 'center' });
+  arrow(C.w2.x + C.w2.w * 0.2, Y0 + 11, C.w1.x + C.w1.w * 0.75, Y0 + 11, 2.2, 5);
+  const ST = C.stage, stTop = Y0 + 16, stBot = Y0 + BH - 4;
+  rect(ST.x, stTop, ST.w, stBot - stTop, '#fbfaff', '#111', 0.5);
+
+  // ---- 待機列：いちばん人数の多い列に合わせて、文字の大きさをそろえる ----
+  const qTop = Y0 + 30, qBot = Y0 + BH - 10;
+  const maxQ = Math.max(1, ...['w3', 'w2', 'w1'].map(key => list(key).length));
+  const lh = Math.min(8.2, (qBot - qTop) / maxQ);
+  const fs = Math.max(2.4, Math.min(4.9, lh * 0.64));
+  const header = (key, y) => {
+    const p = POSMAP[key], c = C[key];
+    rect(c.x, y - 5.2, c.w, 7.2, p.color, null, 0, 1.4);
+    text(`${p.label}（${list(key).length}人）`, c.x + 1.6, y, 4, { w: 700, c: '#fff', max: c.w - 3 });
+  };
+  const nameAt = (key, i, y) => {
+    const p = POSMAP[key], c = C[key];
+    rect(c.x, y - lh * 0.8, 1.2, lh * 0.95, p.color, null, 0, 0.4);
+    text(String(i + 1), c.x + 2.2, y, fs * 0.62, { c: '#888' });
+    text(nameOf(list(key)[i]), c.x + 6, y, fs, { w: 500, max: c.w - 7 });
+  };
+  // 待機3・待機2（先頭は上）
+  for (const key of ['w3', 'w2']) {
+    header(key, Y0 + 21);
+    text('先頭 ↑', C[key].x + C[key].w - 0.5, Y0 + 26.2, 2.8, { a: 'right', c: '#555' });
+    list(key).forEach((id, i) => nameAt(key, i, qTop + lh * (i + 0.75)));
   }
-  showMenu(st.payload);
-  if (L.needsRenew(st.payload)) backgroundRenew(st.payload);
-}
-async function backgroundRenew(prev) {
-  const r = await L.renew();
-  if (r.result === 'ok') {
-    if (r.payload.plan !== prev.plan) { toast(`プランが「${L.PLANS[r.payload.plan].name}」に変わりました`); showMenu(r.payload); return; }
-    showMenu(r.payload);
-    toast('（試作の表示）裏で利用許可証を自動更新しました。ふだんは表示されません', 3800);
-  } else if (r.result === 'ended' || r.result === 'stopped') showBlocked(r.result, prev);
-  // offline のときは何もしない（期限まではそのまま使える）
+  // 音響待機1（先頭は下。下からステージへ進む）
+  header('w1', Y0 + 21);
+  text('先頭 ↓', C.w1.x + 1, stBot - 1.2, 3.2, { w: 700 });
+  arrow(C.w1.x + 15, stBot - 2.3, ST.x - 1.2, stBot - 2.3, 0.8, 2.4);
+  list('w1').forEach((id, i) => nameAt('w1', i, qBot - lh * (i + 0.25)));
+
+  // ---- ステージ：四角の中に等間隔で並べる ----
+  const sp = POSMAP.stage, st = list('stage');
+  rect(ST.x + 2, stTop + 3, ST.w - 4, 8, sp.color, null, 0, 1.4);
+  text(`ステージ（${st.length}人）`, ST.x + ST.w / 2, stTop + 8.9, 4.4, { w: 700, c: '#fff', a: 'center' });
+  if (st.length) {
+    const top = stTop + 14, bot = stBot - 3;
+    const cols = st.length > 18 ? 2 : 1;
+    const per = Math.ceil(st.length / cols);
+    const slot = (bot - top) / per;
+    const sfs = Math.max(2.6, Math.min(cols === 2 ? 4.4 : 5.4, slot * 0.6));
+    const cw = (ST.w - 4) / cols;
+    st.forEach((id, i) => {
+      const c = Math.floor(i / per), r = i % per;
+      const cx = ST.x + 2 + cw * c + cw / 2;
+      const cy = top + slot * (r + 0.5) + sfs * 0.35;
+      text(nameOf(id), cx, cy, sfs, { w: 500, a: 'center', max: cw - 2 });
+    });
+  } else {
+    text('（まだ選ばれていません）', ST.x + ST.w / 2, stTop + 24, 3.4, { a: 'center', c: '#c92a2a' });
+  }
+  // ---- 下のメモ ----
+  text('番号は列の先頭からの順番。待機2・待機3は上が先頭、音響待機1は下が先頭です。', X0, Y0 + BH + 5.5, 2.8, { c: '#555', max: BW - 25 });
+  text(`${k} / ${state.sceneCount}`, X0 + BW, Y0 + BH + 5.5, 3.2, { a: 'right', c: '#555' });
+  ctx.restore();
 }
 
-/* ---------- ログイン ---------- */
-function showLogin(errMsg, email = '') {
-  show(`<div class="center"><form class="card" id="fLogin" novalidate>
-    <img class="logo" src="icon.svg" alt="">
-    <h1>どうぐばこ</h1>
-    <p>園から届いた招待メールに書かれた<br>メールアドレスとパスワードでログインします。</p>
-    ${errMsg ? `<div class="err">${esc(errMsg)}</div>` : ''}
-    <label class="fld">メールアドレス<input id="em" type="email" autocomplete="username" inputmode="email" value="${esc(email)}" placeholder="例：sensei@example.com"></label>
-    <label class="fld">パスワード<input id="pw" type="password" autocomplete="current-password"></label>
-    <button class="btn" id="bLogin" type="submit">ログイン</button>
-    <div style="text-align:center"><button class="linkbtn" type="button" id="forgot">パスワードを忘れたとき</button></div>
-    <div class="demohint">🧪 試作版のため、本物のアカウントはありません。下のボタンでデモ用のアカウントを入力できます（パスワードはすべて demo1234）。
-      <div class="accts"><button type="button" data-em="demo@example.com">スタンダードの園</button><button type="button" data-em="light@example.com">ライトの園</button><button type="button" data-em="ended@example.com">契約が終わった園</button></div></div>
-    <div class="note">🔒 ログインで送るのは、メールアドレスとパスワードだけです。名簿や印鑑などのデータは、この端末の中だけで使われます。</div>
-  </form></div>`);
-  $('#fLogin').querySelectorAll('[data-em]').forEach(b => b.onclick = () => { $('#em').value = b.dataset.em; $('#pw').value = 'demo1234'; $('#bLogin').focus(); });
-  $('#forgot').onclick = () => toast('本番では、パスワードを作り直すためのメールが届きます（試作では未対応）', 3500);
-  $('#fLogin').onsubmit = async e => {
-    e.preventDefault();
-    const em = $('#em').value.trim(), pw = $('#pw').value;
-    if (!em || !pw) { toast('メールアドレスとパスワードを入れてください'); return; }
-    const b = $('#bLogin'); b.disabled = true; b.textContent = '確認しています…';
-    try {
-      const r = await L.login(em, pw);
-      if (r.needCode) showCode(r, em); else showIssuing(true);
-    } catch (err) { showLogin(ERR[err.code] || 'ログインできませんでした。', em); }
-  };
-  setTimeout(() => (email ? $('#pw') : $('#em')).focus(), 50);
+/* ============================================================
+   画面の表示
+   ============================================================ */
+function renderAll() {
+  state.cur = Math.min(Math.max(1, state.cur || 1), state.sceneCount);
+  $('className').value = state.className || '';
+  $('title').value = state.title || '';
+  $('scCount').textContent = state.sceneCount;
+  renderSceneNames(); renderEditor(); renderPreview();
 }
-
-/* ---------- 確認コード（2段階認証） ---------- */
-function showCode(r, email, errMsg) {
-  show(`<div class="center"><form class="card" id="fCode" novalidate>
-    <img class="logo" src="icon.svg" alt="">
-    <h2>確認コードを入れてください</h2>
-    <p><b>${esc(r.sentTo)}</b> に、6けたの確認コードをメールで送りました。</p>
-    ${errMsg ? `<div class="err">${esc(errMsg)}</div>` : ''}
-    <label class="fld">確認コード<input id="cd" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"></label>
-    <label class="check"><input type="checkbox" id="trust" checked> この端末を信頼する（30日間は確認コードを省略します。共用のiPadでは外してください）</label>
-    <button class="btn" id="bCode" type="submit">確認する</button>
-    <div style="text-align:center"><button class="linkbtn" type="button" id="back">ログイン画面に戻る</button></div>
-    <div class="demohint">🧪 試作版のためメールは届きません。確認コードは <b>${esc(r.demoCode)}</b> です。<br><button type="button" id="fill" style="margin-top:6px">コードを入力する</button></div>
-  </form></div>`);
-  $('#fill').onclick = () => { $('#cd').value = r.demoCode; $('#bCode').focus(); };
-  $('#back').onclick = () => showLogin('', email);
-  $('#cd').addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6); });
-  $('#fCode').onsubmit = async e => {
-    e.preventDefault();
-    const b = $('#bCode'); b.disabled = true; b.textContent = '確認しています…';
-    try { await L.confirm(r.ticket, $('#cd').value, $('#trust').checked); showIssuing(false); }
-    catch (err) { if (err.code === 'expired_code') showLogin(ERR.expired_code, email); else showCode(r, email, ERR[err.code] || '確認できませんでした。'); }
-  };
-  setTimeout(() => $('#cd').focus(), 50);
+function renderSceneNames() {
+  $('scNames').innerHTML = Array.from({ length: state.sceneCount }, (_, i) => `<label>場面${i + 1}<input type="text" data-sn="${i}" value="${esc(state.sceneNames[i] || '')}" placeholder="（なし）"></label>`).join('');
+  $('scNames').querySelectorAll('[data-sn]').forEach(inp => inp.addEventListener('input', () => { state.sceneNames[+inp.dataset.sn] = inp.value.trim(); save(); renderTabs(); renderPreview(); }));
 }
-
-/* ---------- 許可証を受け取る（端末に保存） ---------- */
-async function showIssuing(skippedCode) {
-  show(`<div class="center"><div class="card">
-    <img class="logo" src="icon.svg" alt="">
-    <h2>この端末で使えるようにしています</h2>
-    ${skippedCode ? '<p>信頼済みの端末のため、確認コードを省略しました。</p>' : ''}
-    <ul class="steps" id="steps">
-      <li><i></i>園のご契約を確認</li>
-      <li><i></i>利用許可証を受け取る</li>
-      <li><i></i>この端末に保存</li>
-    </ul></div></div>`);
-  const lis = [...document.querySelectorAll('#steps li')];
-  for (const li of lis) { li.className = 'doing'; await sleep(550); li.className = 'done'; li.querySelector('i').textContent = '✓'; }
-  await sleep(250);
-  const st = await L.status();
-  const pl = st.payload;
-  show(`<div class="center"><div class="card">
-    <div class="big-ok">✓</div>
-    <h2>準備ができました</h2>
-    <dl class="pass">
-      <dt>園</dt><dd>${esc(pl.orgName)}</dd>
-      <dt>先生</dt><dd>${esc(pl.staff)}</dd>
-      <dt>プラン</dt><dd>${esc(L.PLANS[pl.plan].name)}（${pl.apps.map(a => esc(L.APP_NAMES[a])).join('・')}）</dd>
-      <dt>有効期限</dt><dd>${fmtDate(pl.exp)}</dd>
-    </dl>
-    <p>この日までは、インターネットにつながっていなくても使えます。<br>期限が近づくと、どうぐばこを開いたときに自動で更新されます。</p>
-    <button class="btn" id="go" type="button">どうぐばこを開く</button>
-  </div></div>`);
-  $('#go').onclick = () => showMenu(pl);
-  $('#go').focus();
-}
-
-/* ---------- 使えないとき ---------- */
-function showBlocked(kind, pl) {
-  const m = {
-    offline: ['インターネットにつないでください', `利用許可証の期限（${pl ? fmtDate(pl.exp) : ''}）が切れています。インターネットにつながる場所で開くと、自動で更新されます。`, '<button class="btn" id="retry" type="button">もう一度試す</button>'],
-    ended: ['ご利用期間が終了しました', '園のご契約が終了したため、どうぐばこのアプリは使えなくなりました。この端末に保存した名簿などのデータは、端末の中に残っています。', '<button class="btn ghost" id="relogin" type="button">ログイン画面へ</button>'],
-    stopped: ['このアカウントは利用が停止されています', '園の管理者が、このアカウントの利用を止めました。心当たりがない場合は、園の管理者にお問い合わせください。', '<button class="btn ghost" id="relogin" type="button">ログイン画面へ</button>'],
-    error: ['確認できませんでした', '時間をおいて、もう一度お試しください。', '<button class="btn" id="retry" type="button">もう一度試す</button>'],
-  }[kind] || ['確認できませんでした', '', '<button class="btn" id="retry" type="button">もう一度試す</button>'];
-  show(`<div class="center"><div class="card">
-    <div class="big-ng">${kind === 'offline' ? '📴' : '!'}</div>
-    <h2>${m[0]}</h2><p>${m[1]}</p>${m[2]}</div></div>`);
-  $('#retry')?.addEventListener('click', boot);
-  $('#relogin')?.addEventListener('click', () => { L.logout(); showLogin(''); });
-}
-
-/* ---------- メニュー ---------- */
-const ICONS = {
-  oyugikai: '<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="5" width="40" height="5" rx="2" fill="#ffd8e4"/><path d="M5 9h11c-1 8-1 17 2 27H5z" fill="#ff8fa3"/><path d="M43 9H32c1 8 1 17-2 27h13z" fill="#ff8fa3"/><path d="M4 36h40v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" fill="#fff"/><circle cx="18.5" cy="25" r="3.2" fill="#fff"/><path d="M14 36c0-4 2-7 4.5-7s4.5 3 4.5 7z" fill="#fff"/><circle cx="29.5" cy="25" r="3.2" fill="#ffd23f"/><path d="M25 36c0-4 2-7 4.5-7s4.5 3 4.5 7z" fill="#ffd23f"/></svg>',
-  nandemo: '<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="5" width="32" height="30" rx="3.5" fill="#fff"/><rect x="11.5" y="8.5" width="25" height="23" rx="2" fill="none" stroke="#d9dfe1" stroke-width="1.6"/><path d="M16 15h16M16 20.5h16M19 26h10" stroke="#b9c2c5" stroke-width="2.4" stroke-linecap="round"/><path d="M19.6 37 17 46l3.8-1.9 2.4 3.3 1.2-8.6zM28.4 37 31 46l-3.8-1.9-2.4 3.3-1.2-8.6z" fill="#ff8fa3"/><circle cx="24" cy="34" r="7" fill="#ff6b81" stroke="#fff" stroke-width="2.4"/><circle cx="24" cy="34" r="3" fill="#fff"/><path d="M40.5 2.5l1.2 3.1 3.1 1.2-3.1 1.2-1.2 3.1-1.2-3.1-3.1-1.2 3.1-1.2z" fill="#ffd23f"/></svg>',
-  marathon: '<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="7" y="6" width="27" height="33" rx="3.5" fill="#fff"/><path d="M12.5 14h16M12.5 20h16M12.5 26h9" stroke="#e8a35c" stroke-width="2.6" stroke-linecap="round"/><path d="M30.2 36.5 27.4 45l3.8-1.7 2.3 3.2 1.4-8.2zM39.8 36.5l2.8 8.5-3.8-1.7-2.3 3.2-1.4-8.2z" fill="#fff"/><circle cx="35" cy="32" r="8" fill="#ffd23f" stroke="#fff" stroke-width="2.6"/><path d="m35 27.6 1.35 2.75 3.03.44-2.19 2.13.52 3.02L35 34.52l-2.71 1.42.52-3.02-2.19-2.13 3.03-.44z" fill="#fff"/></svg>',
-  busroute: '<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="11" width="40" height="24" rx="6" fill="#fff"/><rect x="8.5" y="15.5" width="7.5" height="7.5" rx="1.8" fill="#8fbf62"/><rect x="19" y="15.5" width="7.5" height="7.5" rx="1.8" fill="#8fbf62"/><rect x="29.5" y="15.5" width="10" height="9.5" rx="1.8" fill="#8fbf62"/><rect x="4" y="27.5" width="40" height="2.6" fill="#cfe3b9"/><circle cx="41" cy="31.5" r="1.6" fill="#ffd23f"/><circle cx="14" cy="35.5" r="5" fill="#33413a" stroke="#fff" stroke-width="2.6"/><circle cx="34" cy="35.5" r="5" fill="#33413a" stroke="#fff" stroke-width="2.6"/></svg>',
-};
-// 準備中のアプリ（できあがったら APPS に移す）
-const SOON = [
-  { id: 'nandemo', name: 'なんでも賞状', n: 'なんでも<br>賞状' },
-];
-const APPS = [
-  { id: 'marathon', n: 'マラソン大会<br>表彰状', color: 'var(--c-shou)', href: 'marathon/' },
-  { id: 'busroute', n: 'バスルート<br>計画', color: 'var(--c-jimu)', href: 'busroute/', net: true },
-  { id: 'oyugikai', n: 'お遊戯会<br>立ち位置', color: '#7048e8', href: 'oyugikai/' },
-];
-function showMenu(pl) {
-  const near = L.loginRequired && daysLeft(pl) <= 7;
-  show(`<div class="wrap">
-    <div class="top">
-      <img src="icon.svg" alt="">
-      <div class="ttl"><h1>どうぐばこ</h1><p>${esc(pl.orgName)}</p></div>
-      ${L.loginRequired ? `<button class="chip ${near ? 'warn' : ''}" id="chip" type="button"><span class="dot"></span><span>${esc(pl.staff)}<small>${esc(L.PLANS[pl.plan].name)}プラン・あと${daysLeft(pl)}日有効</small></span></button>` : ''}
+function renderEditor() {
+  const box = $('editor');
+  if (!state.roster.length) { box.innerHTML = '<div class="empty">先に、1 でクラスの名簿を読み込んでください。</div>'; return; }
+  box.innerHTML = `
+    <div class="tabs" id="tabs"></div>
+    <div class="tools">
+      <button type="button" id="tCopy">← 前の場面と同じにする</button>
+      <button type="button" id="tClear">この場面を空にする</button>
     </div>
-    <section>
-      <h2>使えるアプリ</h2>
-      <div class="grid">${APPS.map(a => {
-        const ok = pl.apps.includes(a.id);
-        return ok ? `<a class="app" href="${a.href}">${a.net ? '<em class="net">ネット</em>' : ''}<span class="tile" style="background:${a.color}">${ICONS[a.id]}</span><span>${a.n}</span></a>`
-          : `<button class="app locked" type="button" data-lock="${a.id}"><em class="lock">🔒</em><span class="tile">${ICONS[a.id]}</span><span>${a.n}</span></button>`;
-      }).join('')}</div>
-      <p class="legend"><span><i>ネット</i>地図などのためにインターネットを使うアプリ（園児の情報は送りません）</span>${APPS.some(a => !pl.apps.includes(a.id)) ? '<span>🔒 今のプランでは使えないアプリ</span>' : ''}</p>
-    </section>
-    <section>
-      <h2>準備中のアプリ <small>これから増えていきます</small></h2>
-      <div class="grid">${SOON.map(a => `<button class="app soon" type="button" data-soon="${esc(a.name)}"><em class="badge">準備中</em><span class="tile">${ICONS[a.id]}</span><span>${a.n}</span></button>`).join('')}</div>
-    </section>
-    <div class="privacy">🔒 名簿・印鑑・コースなど、アプリで使うデータは<b>この端末（iPad・パソコン）の中だけ</b>に保存されます。どうぐばこのサーバーに送られることはありません。</div>
-  </div>`);
-  $('#chip')?.addEventListener('click', () => accountDialog(pl));
-  document.querySelectorAll('[data-soon]').forEach(b => b.onclick = () => toast(`「${b.dataset.soon}」は準備中です。できあがったら、ここから使えるようになります`, 3200));
-  document.querySelectorAll('[data-lock]').forEach(b => b.onclick = () => {
-    const plan = Object.values(L.PLANS).find(p => p.apps.includes(b.dataset.lock));
-    openDlg(`<div class="dlg"><h3>🔒 ${L.APP_NAMES[b.dataset.lock]}</h3><p style="margin:0;font-size:.9rem;line-height:1.7">このアプリは<b>${plan.name}プラン</b>で使えます。園の管理者がプランを変更すると、次にどうぐばこを開いたときから使えるようになります。</p><div class="row"><button class="btn" data-close type="button">閉じる</button></div></div>`);
+    <div class="boxes" id="boxes"></div>
+    <div class="picker">
+      <div class="ptitle"><span>名前をタップすると <b id="activeName"></b> に入ります（もう一度タップで外れます）</span>
+        <label class="chk"><input type="checkbox" id="onlyLeft" ${onlyLeft ? 'checked' : ''}> まだ入っていない子だけ</label></div>
+      <div class="names" id="names"></div>
+      <div id="leftInfo"></div>
+    </div>`;
+  $('tCopy').onclick = copyPrev;
+  $('tClear').onclick = () => {
+    if (!placedCount(state.cur)) return;
+    confirmDlg(`場面${state.cur}を空にしますか？`, 'この場面で入れた子が、すべての場所から外れます。', '空にする', () => { state.scenes[state.cur] = {}; save(); renderScene(); });
+  };
+  $('onlyLeft').onchange = e => { onlyLeft = e.target.checked; renderNames(); };
+  renderScene();
+}
+function renderScene() { renderTabs(); renderBoxes(); renderNames(); renderPreview(); }
+function renderTabs() {
+  const t = $('tabs'); if (!t) return;
+  t.innerHTML = Array.from({ length: state.sceneCount }, (_, i) => {
+    const k = i + 1;
+    return `<button type="button" class="${k === state.cur ? 'on' : ''}" data-k="${k}">場面${k}<small>${placedCount(k)}/${state.roster.length}人${state.sceneNames[i] ? '・' + esc(state.sceneNames[i]) : ''}</small></button>`;
+  }).join('');
+  t.querySelectorAll('[data-k]').forEach(b => b.onclick = () => { state.cur = +b.dataset.k; save(); renderScene(); });
+  t.querySelector('.on')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+function renderBoxes() {
+  const s = scene(state.cur);
+  $('boxes').innerHTML = POS.map(p => `
+    <div class="pbox ${p.key === active ? 'on' : ''}" style="--c:${p.color}" data-p="${p.key}" role="button" tabindex="0" aria-pressed="${p.key === active}">
+      <div class="ph">${p.label}<small>${s[p.key].length}人</small></div>
+      <div class="pnote">${p.note}</div>
+      <ol>${s[p.key].filter(id => nameOf(id)).map((id, i, arr) => `<li><span class="no">${i + 1}</span><span class="nm">${esc(nameOf(id))}</span>
+        ${i > 0 ? `<button type="button" data-up="${id}" data-from="${p.key}" title="先頭の方へ">↑</button>` : ''}<button type="button" data-rm="${id}" title="外す">✕</button></li>`).join('')}</ol>
+      <div class="here">${p.key === active ? '▼ ここに入れます' : 'タップでここに入れる'}</div>
+    </div>`).join('');
+  $('boxes').querySelectorAll('.pbox').forEach(b => b.addEventListener('click', e => {
+    if (e.target.closest('button')) return;
+    active = b.dataset.p; renderBoxes(); renderNames();
+  }));
+  $('boxes').querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { const k = posOf(state.cur, b.dataset.rm); if (k) assign(state.cur, b.dataset.rm, k); renderScene(); });
+  $('boxes').querySelectorAll('[data-up]').forEach(b => b.onclick = () => {
+    const arr = scene(state.cur)[b.dataset.from]; const i = arr.indexOf(b.dataset.up);
+    if (i > 0) { [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]; save(); renderBoxes(); renderPreview(); }
   });
 }
-function accountDialog(pl) {
-  openDlg(`<div class="dlg"><h3>アカウントと利用許可証</h3>
-    <dl class="pass">
-      <dt>園</dt><dd>${esc(pl.orgName)}</dd>
-      <dt>先生</dt><dd>${esc(pl.staff)}</dd>
-      <dt>メール</dt><dd style="word-break:break-all">${esc(pl.sub)}</dd>
-      <dt>プラン</dt><dd>${esc(L.PLANS[pl.plan].name)}</dd>
-      <dt>有効期限</dt><dd>${fmtDate(pl.exp)}（あと${daysLeft(pl)}日）</dd>
-      <dt>最終確認</dt><dd>${L.lastChecked() ? fmtDT(L.lastChecked()) : '—'}</dd>
-    </dl>
-    <p style="margin:0;font-size:.8rem;color:var(--muted);line-height:1.7">期限までは、インターネットにつながっていなくても使えます。期限の7日前からと、1日に1回、どうぐばこを開いたときに自動で確認・更新します。</p>
-    <div class="row"><button class="btn ghost" id="logout" type="button">ログアウト</button><button class="btn" data-close type="button">閉じる</button></div></div>`);
-  $('#logout').onclick = () => {
-    openDlg(`<div class="dlg"><h3>ログアウトしますか？</h3><p style="margin:0;font-size:.9rem;line-height:1.7">この端末の利用許可証を消します。アプリを使うには、もう一度ログインが必要です。<br>名簿や印鑑などのデータは消えません。</p>
-      <div class="row"><button class="btn ghost" data-close type="button">やめる</button><button class="btn" id="doLogout" type="button">ログアウト</button></div></div>`);
-    $('#doLogout').onclick = () => { closeDlg(); L.logout(); showLogin(''); toast('ログアウトしました'); };
-  };
+function renderNames() {
+  const p = POSMAP[active];
+  $('activeName').textContent = `「${p.label}」`; $('activeName').style.color = p.color;
+  const left = state.roster.filter(r => !posOf(state.cur, r.id));
+  const shown = onlyLeft ? left : state.roster;
+  $('names').innerHTML = shown.map(r => {
+    const k = posOf(state.cur, r.id); const q = k && POSMAP[k];
+    return `<button type="button" data-id="${r.id}" class="${k ? 'placed' : ''} ${k === active ? 'here' : ''}" style="--c:${q ? q.color : '#999'}">${esc(r.name)}${q ? `<span class="tag">${q.label}</span>` : ''}</button>`;
+  }).join('') || '<div class="hint">全員、どこかに入っています。</div>';
+  $('names').querySelectorAll('[data-id]').forEach(b => b.onclick = () => { assign(state.cur, b.dataset.id, active); renderTabs(); renderBoxes(); renderNames(); renderPreview(); });
+  $('leftInfo').innerHTML = left.length
+    ? `<div class="left">この場面で、まだどこにも入っていない子：${left.length}人（${esc(left.slice(0, 6).map(r => r.name).join('、'))}${left.length > 6 ? ' …' : ''}）</div>`
+    : `<div class="left ok">✓ この場面は、クラス全員がどこかに入っています</div>`;
 }
-function openDlg(html) { const d = $('#dlg'); d.innerHTML = html; d.querySelectorAll('[data-close]').forEach(b => b.onclick = closeDlg); if (!d.open) d.showModal(); }
-function closeDlg() { const d = $('#dlg'); if (d.open) d.close(); }
-$('#dlg').addEventListener('click', e => { if (e.target === $('#dlg')) closeDlg(); });
+function copyPrev() {
+  const k = state.cur; if (k <= 1) { toast('場面1には前の場面がありません'); return; }
+  const doIt = () => { const p = scene(k - 1); state.scenes[k] = Object.fromEntries(POS.map(x => [x.key, [...p[x.key]]])); save(); renderScene(); toast(`場面${k - 1}と同じ並びにしました。ここから入れ替えてください`); };
+  if (placedCount(k)) confirmDlg(`場面${k}を、場面${k - 1}と同じ並びにしますか？`, `場面${k}で入れた内容は、場面${k - 1}の並びで置きかわります。`, '同じにする', doIt);
+  else doIt();
+}
+function renderPreview() {
+  const N = state.sceneCount;
+  const k = Math.min(Math.max(1, state.cur), N);
+  $('pvLabel').textContent = `場面${k} ／ 全${N}場面`;
+  $('pvPrev').disabled = k <= 1; $('pvNext').disabled = k >= N;
+  drawPage($('pv'), k);
+}
 
 /* ============================================================
-   試作の体験メニュー（本番にはありません）
-   いろいろな状況を再現して、使い心地を確かめるためのもの
+   PDF の作成（A4縦・場面ごとに1ページ）
    ============================================================ */
-async function demoMenu() {
-  const D = L.demo; const S = D.server;
-  const st = await L.status(); const pl = st.payload; const email = D.currentEmail();
-  const orgId = email && S.orgOf(email); const org = orgId && S.org(orgId);
-  const stateText = { none: 'ログインしていません', bad: '許可証が書き換えられています', expired: '許可証の期限が切れています', ok: '有効な許可証があります' }[st.state] || st.state;
-  openDlg(`<div class="dlg demo"><h3>🧪 試作の体験メニュー</h3>
-    <p>いろいろな状況を再現できます。操作すると「どうぐばこを開き直した」ときの動きになります。</p>
-    <div class="now">今の状態：<b>${stateText}</b>${pl ? `<br>${esc(pl.orgName)}／${esc(pl.staff)}／${esc(L.PLANS[pl.plan].name)}／期限 ${fmtDate(pl.exp)}` : ''}${L.isOffline() ? '<br>📴 ネットを切った状態' : ''}</div>
-    <div class="grp"><b>インターネット</b><p>ネットがないときでも、許可証の期限内ならそのまま使えます。</p>
-      <div class="acts"><button type="button" class="${L.isOffline() ? '' : 'on'}" data-a="online">つながっている</button><button type="button" class="${L.isOffline() ? 'on' : ''}" data-a="offline">ネットを切る</button></div></div>
-    ${email ? `
-    <div class="grp"><b>許可証の期限</b><p>「期限が近い」にすると、開いたときに裏で自動更新されます。「期限切れ」はネットがあれば自動で更新、なければ案内が出ます。</p>
-      <div class="acts"><button type="button" data-a="near">期限が近い（あと2日）</button><button type="button" data-a="expire">期限切れにする</button><button type="button" data-a="tamper">許可証を書き換える</button></div></div>
-    <div class="grp"><b>園の管理者・会社側の操作</b><p>次に許可証を確認したとき（開いたとき）に反映されます。</p>
-      <div class="acts">
-        <button type="button" data-a="plan" data-p="${org && org.plan === 'standard' ? 'light' : 'standard'}">プランを「${org && org.plan === 'standard' ? 'ライト' : 'スタンダード'}」に変える</button>
-        <button type="button" data-a="${org && org.active ? 'end' : 'resume'}">${org && org.active ? '園の契約を終了する' : '園の契約を再開する'}</button>
-        <button type="button" data-a="${S.isStopped(email) ? 'unstop' : 'stop'}">${S.isStopped(email) ? 'この先生の停止を解除' : 'この先生の利用を停止'}</button>
-      </div></div>` : `<div class="grp"><b>園の管理者・会社側の操作</b><p>ログインすると操作できます。「契約が終わった園」のアカウントでログインを試すこともできます。</p>
-      <div class="acts"><button type="button" data-a="resumeAll">契約が終わった園を再開する</button></div></div>`}
-    <div class="grp"><b>アプリを直接開く</b><p>ホーム画面からではなく、アプリのURLを直接開いたときの動きです（許可証がないと使えません）。</p>
-      <div class="acts"><a href="marathon/" style="text-decoration:none"><button type="button">マラソン表彰状を開く</button></a><a href="busroute/" style="text-decoration:none"><button type="button">バスルートを開く</button></a></div></div>
-    <div class="grp"><div class="acts"><button type="button" data-a="reset">体験を最初からやり直す</button><button type="button" data-close>閉じる</button></div></div>
-  </div>`);
-  document.querySelectorAll('.demo [data-a]').forEach(b => b.onclick = async () => {
-    const a = b.dataset.a; let msg = '';
-    if (a === 'online') { D.setOffline(false); msg = 'ネットにつながった状態にしました'; }
-    if (a === 'offline') { D.setOffline(true); msg = 'ネットを切った状態にしました'; }
-    if (a === 'near') { await D.setExpiry(Date.now() + 2 * L.DAY); msg = '許可証の期限を「あと2日」にしました'; }
-    if (a === 'expire') { await D.setExpiry(Date.now() - 60000); msg = '許可証を期限切れにしました'; }
-    if (a === 'tamper') { D.tamper(); msg = '許可証の中身を書き換えました（プランを勝手に上げた想定）'; }
-    if (a === 'plan') { S.setPlan(orgId, b.dataset.p); D.forceRecheck(); msg = `園のプランを「${L.PLANS[b.dataset.p].name}」に変えました`; }
-    if (a === 'end') { S.setActive(orgId, false); D.forceRecheck(); msg = '園の契約を終了しました'; }
-    if (a === 'resume') { S.setActive(orgId, true); D.forceRecheck(); msg = '園の契約を再開しました'; }
-    if (a === 'resumeAll') { S.setActive('aozora', true); msg = '「あおぞら幼稚園」の契約を再開しました'; }
-    if (a === 'stop') { S.setStopped(email, true); D.forceRecheck(); msg = 'この先生の利用を停止しました'; }
-    if (a === 'unstop') { S.setStopped(email, false); D.forceRecheck(); msg = 'この先生の停止を解除しました'; }
-    if (a === 'reset') { D.resetAll(); msg = '体験を最初からやり直します'; }
-    closeDlg();
-    toast(msg + ' → どうぐばこを開き直します', 2200);
-    await sleep(900);
-    boot();
+async function makePdf() {
+  if (!state.roster.length) { toast('先に名簿を読み込んでください'); return; }
+  const empty = []; for (let j = 1; j <= state.sceneCount; j++) if (!placedCount(j)) empty.push(j);
+  if (empty.length) toast(`場面${empty.join('・')}は、まだ誰も入っていません`, 3500);
+  await (document.fonts && document.fonts.ready);
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+  const cv = document.createElement('canvas'); cv.width = 1654; cv.height = 2339;   // 約200dpi
+  for (let k = 1; k <= state.sceneCount; k++) {
+    if (k > 1) pdf.addPage('a4', 'portrait');
+    drawPage(cv, k);
+    pdf.addImage(cv.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+    await new Promise(r => setTimeout(r, 0));
+  }
+  const name = `立ち位置_${state.className || 'クラス'}${state.title ? '_' + state.title : ''}.pdf`.replace(/[\\/:*?"<>|]/g, '');
+  const blob = pdf.output('blob');
+  const url = URL.createObjectURL(blob);
+  const file = new File([blob], name, { type: 'application/pdf' });
+  const canShare = navigator.canShare && navigator.canShare({ files: [file] });
+  openDlg(`<div class="dlg"><h3>PDFができました</h3>
+    <p style="margin:0">${esc(name)}（${state.sceneCount}ページ）</p>
+    <div class="list">
+      ${canShare ? '<button type="button" id="pdShare">📤 保存・共有・印刷する<small>「ファイルに保存」や「プリント」を選べます</small></button>' : ''}
+      <button type="button" id="pdOpen">📄 PDFを開く</button>
+      <a href="${url}" download="${esc(name)}" style="text-decoration:none"><button type="button" style="width:100%;text-align:left">⬇ PDFをダウンロード</button></a>
+    </div>
+    <div class="acts"><button type="button" data-close>閉じる</button></div></div>`);
+  $('pdShare')?.addEventListener('click', () => navigator.share({ files: [file], title: name }).catch(() => {}));
+  $('pdOpen').onclick = () => window.open(url, '_blank');
+}
+
+/* ============================================================
+   データ（この端末の中）：書き出し・読み込み・消す
+   ============================================================ */
+function dataMenu() {
+  openDlg(`<div class="dlg"><h3>データ</h3>
+    <p class="hint" style="margin:0">作業中の内容は、この端末の中に自動で保存されています。別のiPadで続きをするときは、ファイルに書き出して読み込みます。</p>
+    <div class="list">
+      <button type="button" id="dmExp">⬇ ファイルに書き出す（.json）<small>名簿・場面・並びがすべて入ります（園児の名前が入るので扱いに注意）</small></button>
+      <button type="button" id="dmImp">📂 ファイルから読み込む</button>
+      <button type="button" id="dmClear" style="color:var(--bad)">🗑 この端末からデータを消す<small>名簿と並びをすべて消して、最初からにします</small></button>
+    </div>
+    <div class="acts"><button type="button" data-close>閉じる</button></div></div>`);
+  $('dmExp').onclick = () => {
+    const name = `立ち位置データ_${state.className || 'クラス'}${state.title ? '_' + state.title : ''}.json`.replace(/[\\/:*?"<>|]/g, '');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(state, null, 1)], { type: 'application/json' })); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 3000); closeDlg();
+  };
+  $('dmImp').onclick = () => { closeDlg(); $('jsonIn').click(); };
+  $('dmClear').onclick = () => confirmDlg('この端末からデータを消しますか？', '名簿・場面・並びがすべて消えます。元に戻せません。', '消す', () => {
+    try { Object.keys(localStorage).filter(k => k.startsWith(NS)).forEach(k => localStorage.removeItem(k)); } catch (e) { }
+    state = blank(); lastBook = null; $('classBox').hidden = true; $('fileInfo').textContent = 'Numbers・Excel・CSV に対応'; renderAll(); toast('消しました');
   });
 }
-$('#demoBtn').onclick = demoMenu;
+$('jsonIn').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const s = JSON.parse(await f.text());
+    if (!Array.isArray(s.roster) || typeof s.scenes !== 'object') throw 0;
+    state = { ...blank(), ...s, sceneCount: Math.min(MAX_SCENES, Math.max(1, +s.sceneCount || 1)) };
+    save(); renderAll(); toast('読み込みました');
+  } catch (err) { toast('このファイルは読み込めませんでした'); }
+});
 
-// オフライン対応：一度開いたアプリを端末に保存する（sw.js）。端末に保存したデータが自動で消されにくくする
+/* ---------- ダイアログ ---------- */
+function openDlg(html) { const d = $('dlg'); d.innerHTML = html; d.querySelectorAll('[data-close]').forEach(b => b.onclick = closeDlg); if (!d.open) d.showModal(); }
+function closeDlg() { const d = $('dlg'); if (d.open) d.close(); }
+function confirmDlg(title, body, okLabel, fn) {
+  openDlg(`<div class="dlg"><h3>${esc(title)}</h3><p style="margin:0">${esc(body)}</p><div class="acts"><button type="button" data-close>やめる</button><button type="button" class="primary" id="cfOk">${esc(okLabel)}</button></div></div>`);
+  $('cfOk').onclick = () => { closeDlg(); fn(); };
+}
+$('dlg').addEventListener('click', e => { if (e.target === $('dlg')) closeDlg(); });
+
+/* ---------- 操作 ---------- */
+$('btnFile').onclick = () => $('fileIn').click();
+$('fileIn').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) loadRosterFile(f); });
+$('classSel').addEventListener('change', e => { if (e.target.value !== '') applyClass(+e.target.value); });
+$('className').addEventListener('input', e => { state.className = e.target.value; save(); renderPreview(); });
+$('title').addEventListener('input', e => { state.title = e.target.value; save(); renderPreview(); });
+function setCount(n) {
+  n = Math.min(MAX_SCENES, Math.max(1, n));
+  if (n === state.sceneCount) return;
+  state.sceneCount = n;
+  if (state.cur > n) state.cur = n;
+  save();
+  $('scCount').textContent = n;          // 間の数字を変える
+  renderSceneNames(); renderEditor(); renderPreview();
+}
+$('scMinus').onclick = () => {
+  const n = state.sceneCount - 1; if (n < 1) return;
+  if (placedCount(state.sceneCount)) confirmDlg(`場面${state.sceneCount}を減らしますか？`, `場面${state.sceneCount}で入れた並びは使われなくなります（場面を増やし直すと戻ります）。`, '減らす', () => setCount(n));
+  else setCount(n);
+};
+$('scPlus').onclick = () => { if (state.sceneCount >= MAX_SCENES) { toast(`場面は${MAX_SCENES}までです`); return; } setCount(state.sceneCount + 1); };
+$('pvPrev').onclick = () => { if (state.cur > 1) { state.cur--; save(); state.roster.length ? renderScene() : renderPreview(); } };
+$('pvNext').onclick = () => { if (state.cur < state.sceneCount) { state.cur++; save(); state.roster.length ? renderScene() : renderPreview(); } };
+$('btnPdf').onclick = makePdf;
+$('btnMore').onclick = dataMenu;
+
+/* ---------- 起動 ---------- */
+renderAll();
+if (document.fonts) document.fonts.ready.then(renderPreview);
+document.addEventListener('DOMContentLoaded', () => { if (window.DouguLicense) window.DouguLicense.guardApp('oyugikai', '../'); });
+// オフライン対応：どうぐばこ共通の仕組み（sw.js）に登録。保存したデータが自動で消されにくくする
 if (/^https?:$/.test(location.protocol)) {
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(() => {});
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 }
-document.addEventListener('DOMContentLoaded', () => {
-  L = window.DouguLicense;
-  if (!L) show('<div class="center"><div class="card"><h2>読み込みに失敗しました</h2><p>common/license.js が見つかりません。</p></div></div>');
-  else boot();
-});
 </script>
 </body>
 </html>
