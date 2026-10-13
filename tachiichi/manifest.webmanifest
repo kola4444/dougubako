@@ -1,0 +1,15 @@
+{
+  "name": "お遊戯会 立ち位置",
+  "short_name": "立ち位置",
+  "description": "お遊戯会の場面ごとの立ち位置・待機列を作ってPDFにする",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f3fa",
+  "theme_color": "#2b2140",
+  "icons": [
+    { "src": "icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
