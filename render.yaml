@@ -44,3 +44,10 @@ services:
       - path: /manifest.webmanifest
         name: Cache-Control
         value: no-cache
+      # 先生に配る「お遊戯会 立ち位置」配布版の、オフライン対応の仕組みと設定
+      - path: /tachiichi/sw.js
+        name: Cache-Control
+        value: no-cache
+      - path: /tachiichi/manifest.webmanifest
+        name: Cache-Control
+        value: no-cache
