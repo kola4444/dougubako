@@ -14,6 +14,7 @@
 <!-- 名簿の読み込み（SheetJS）と PDF 作成（jsPDF）は、どうぐばこのサイトに置いたものを使う -->
 <script src="../vendor/sheetjs/xlsx.full.min.js"></script>
 <script src="../vendor/jspdf/jspdf.umd.min.js"></script>
+<script src="../vendor/sortable/Sortable.min.js"></script>
 <script defer src="../common/license.js"></script>
 <style>
 :root{
@@ -61,22 +62,26 @@ details.scnames summary{cursor:pointer;color:var(--accent);font-size:14px;margin
 .tools{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
 .tools button{font-size:13px;min-height:36px;padding:4px 10px}
 
-/* 並ぶ場所（ボックス） */
-.boxes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
-@media (max-width:700px){.boxes{grid-template-columns:repeat(2,minmax(0,1fr))}}
-.pbox,.pbox ol,.pbox li{min-width:0}
-.pbox{border:2px solid var(--line);border-radius:12px;background:#fff;display:flex;flex-direction:column;min-height:170px;cursor:pointer}
-.pbox.on{border-color:var(--c);box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 25%,transparent)}
-.pbox .ph{background:var(--c);color:#fff;border-radius:9px 9px 0 0;padding:6px 8px;font-weight:700;font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:4px}
-.pbox .ph small{font-weight:400;font-size:11px;opacity:.9}
-.pbox .pnote{font-size:11px;color:var(--muted);padding:3px 8px 0}
-.pbox ol{list-style:none;margin:0;padding:4px 6px 8px;display:grid;gap:3px}
-.pbox li{display:flex;align-items:center;gap:4px;font-size:13px;border:1px solid var(--line);border-radius:7px;padding:2px 2px 2px 6px;background:#fff}
-.pbox li .no{color:var(--muted);font-size:11px;min-width:16px}
-.pbox li .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pbox li button{flex:none;min-height:28px;min-width:26px;padding:0;border:0;background:#f3f1f8;border-radius:6px;font-size:12px}
-.pbox .here{margin:auto 8px 8px;font-size:12px;text-align:center;color:var(--c);font-weight:700}
-.pbox:not(.on) .here{color:var(--muted);font-weight:400}
+/* 並ぶ場所：選ぶボタン（人数つき） */
+.posbar{display:flex;gap:6px;flex-wrap:wrap}
+.posbar button{border:2px solid var(--c);color:var(--c);background:#fff;border-radius:10px;min-height:44px;padding:4px 12px;font-weight:700;line-height:1.2;text-align:left}
+.posbar button small{display:block;font-weight:400;font-size:11px;color:var(--muted)}
+.posbar button.on{background:var(--c);color:#fff}
+.posbar button.on small{color:rgba(255,255,255,.85)}
+/* 選んでいる場所の中身 */
+.panel{border:2px solid var(--c);border-radius:12px;margin-top:10px;overflow:hidden}
+.panel .ph{background:var(--c);color:#fff;padding:8px 12px;font-weight:700;display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.panel .ph small{font-weight:400;font-size:12px;opacity:.95}
+.panel ol{list-style:none;margin:0;padding:8px;display:grid;gap:6px;min-height:56px}
+.panel li{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:4px 4px 4px 6px;background:#fff;font-size:15px;touch-action:none;user-select:none;-webkit-user-select:none}
+.panel li .grip{color:#9b95ad;font-size:20px;line-height:1;padding:0 4px;cursor:grab}
+.panel li .no{color:var(--muted);font-size:12px;min-width:22px;text-align:right}
+.panel li .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.panel li button{flex:none;min-height:36px;min-width:36px;padding:0;border:0;background:#f3f1f8;border-radius:8px}
+.panel .emptyl{color:var(--muted);font-size:13px;padding:10px;text-align:center}
+.panel .howto{font-size:12px;color:var(--muted);padding:0 12px 8px}
+.sortable-ghost{opacity:.35}
+.sortable-chosen{box-shadow:0 6px 16px rgba(0,0,0,.18);border-color:var(--c)!important}
 
 /* 名簿から選ぶ */
 .picker{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px}
@@ -177,15 +182,15 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => 'c' + Math.random().toString(36).slice(2, 10);
 const MAX_SCENES = 30;
-// 並ぶ場所（図の左から順）。色は画面とPDFで同じ
-const POS = [
-  { key: 'w3', label: '待機3', color: '#2f9e44', note: '後ろの待機列（先頭は上）' },
-  { key: 'w2', label: '待機2', color: '#1971c2', note: '後ろの待機列（先頭は上）' },
-  { key: 'w1', label: '音響待機1', color: '#e8590c', note: '階段を上がった先（先頭は下）' },
-  { key: 'stage', label: 'ステージ', color: '#7048e8', note: '今の場面で舞台に立つ子' },
-];
-const POSMAP = Object.fromEntries(POS.map(p => [p.key, p]));
-
+// 並ぶ場所：ステージ・音響待機1・待機2…（待機の数＝場面の数−1）。色は画面とPDFで同じ
+const LINE_COLORS = ['#1971c2', '#2f9e44', '#0c8599', '#c2255c', '#5c940d', '#ae3ec9', '#e67700', '#3b5bdb', '#087f5b', '#d6336c'];
+function positions(N = state.sceneCount) {
+  const out = [{ key: 'stage', label: 'ステージ', color: '#7048e8', note: '今の場面で舞台に立つ子' }];
+  if (N >= 2) out.push({ key: 'w1', label: '音響待機1', color: '#e8590c', note: '階段を上がった先の列。下が先頭' });
+  for (let i = 2; i <= N - 1; i++) out.push({ key: 'w' + i, label: '待機' + i, color: LINE_COLORS[(i - 2) % LINE_COLORS.length], note: '後ろの待機列。上が先頭' });
+  return out;
+}
+const posInfo = key => positions(MAX_SCENES).find(p => p.key === key);
 function blank() { return { version: 2, className: '', title: '', sceneCount: 5, sceneNames: [], roster: [], scenes: {}, cur: 1 }; }
 let state;
 try { state = JSON.parse(localStorage.getItem(LS_CUR)) || blank(); } catch (e) { state = blank(); }
@@ -201,19 +206,20 @@ function toast(msg, ms = 2800) { const t = $('toast'); t.textContent = msg; t.cl
 /* ---------- 場面ごとの並び ---------- */
 function scene(k) {
   const s = state.scenes[k] || (state.scenes[k] = {});
-  for (const p of POS) if (!Array.isArray(s[p.key])) s[p.key] = [];
+  for (const p of positions()) if (!Array.isArray(s[p.key])) s[p.key] = [];
   return s;
 }
-function posOf(k, id) { const s = scene(k); for (const p of POS) if (s[p.key].includes(id)) return p.key; return null; }
+// 今の場面の数で使う場所だけを見る（場面を減らして使わなくなった待機列は数えない）
+function posOf(k, id) { const s = scene(k); for (const p of positions()) if (s[p.key].includes(id)) return p.key; return null; }
 // その場面で、子を場所に入れる（別の場所にいれば移す。同じ場所にいれば外す）
 function assign(k, id, key) {
   const s = scene(k); const was = posOf(k, id);
-  if (was) s[was] = s[was].filter(x => x !== id);
+  for (const key of Object.keys(s)) s[key] = s[key].filter(x => x !== id);
   if (was !== key) s[key].push(id);
   save();
 }
 const nameOf = id => (state.roster.find(r => r.id === id) || {}).name || '';
-const placedCount = k => { const s = scene(k); return POS.reduce((a, p) => a + s[p.key].filter(id => nameOf(id)).length, 0); };
+const placedCount = k => { const s = scene(k); return positions().reduce((a, p) => a + s[p.key].filter(id => nameOf(id)).length, 0); };
 const sceneLabel = j => `場面${j}` + (state.sceneNames[j - 1] ? `「${state.sceneNames[j - 1]}」` : '');
 
 /* ============================================================
@@ -295,7 +301,7 @@ function applyClass(i) {
     const byName = new Map(state.roster.map(r => [r.name, r.id]));
     state.roster = c.names.map(n => ({ id: byName.get(n) || uid(), name: n }));
     const keep = new Set(state.roster.map(r => r.id));
-    for (const k of Object.keys(state.scenes)) { const s = scene(k); for (const p of POS) s[p.key] = s[p.key].filter(id => keep.has(id)); }
+    for (const k of Object.keys(state.scenes)) { const s = scene(k); for (const key of Object.keys(s)) s[key] = s[key].filter(id => keep.has(id)); }
     if (!state.className || state.className === state._autoClass) { state.className = c.label; state._autoClass = c.label; }
     save(); renderAll();
     $('classPreview').textContent = `${c.label}：${c.names.length}人（${c.names.slice(0, 4).join('、')}${c.names.length > 4 ? ' …' : ''}）`;
@@ -313,15 +319,15 @@ const sameNames = (a, b) => a.length === b.length && a.every((x, i) => x === b[i
    ============================================================ */
 const FONT = '"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",sans-serif';
 function drawPage(cv, k) {
-  const W = cv.width, H = cv.height, mm = W / 210;
+  const W = cv.width, mm = W / 210;
   const ctx = cv.getContext('2d');
-  ctx.save(); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
-  const s = scene(k);
-  const list = key => s[key].filter(id => nameOf(id));
+  ctx.save(); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, cv.height);
+  const N = state.sceneCount, s = scene(k), P = positions();
+  const list = key => (s[key] || []).filter(id => nameOf(id));
   const f = (px, w = 400) => `${w} ${px}px ${FONT}`;
   const text = (str, x, y, size, opt = {}) => {
     ctx.font = f(size * mm, opt.w || 400); ctx.fillStyle = opt.c || '#111'; ctx.textAlign = opt.a || 'left';
-    if (opt.max) { let sz = size; while (ctx.measureText(str).width > opt.max * mm && sz > 2) { sz -= 0.2; ctx.font = f(sz * mm, opt.w || 400); } }
+    if (opt.max) { let sz = size; while (ctx.measureText(str).width > opt.max * mm && sz > 1.8) { sz -= 0.2; ctx.font = f(sz * mm, opt.w || 400); } }
     ctx.fillText(str, x * mm, y * mm);
     return ctx.measureText(str).width / mm;
   };
@@ -345,74 +351,85 @@ function drawPage(cv, k) {
   if (state.title) text(state.title, L + x + 5, 17, 6, { c: '#333', max: R - L - x - 8 });
   rect(L, 22, 30, 11.5, '#111', null, 0, 2.5);
   text(`場面 ${k}`, L + 15, 30.3, 6.6, { w: 700, c: '#fff', a: 'center' });
-  x = text(`／ 全${state.sceneCount}場面`, L + 33, 30.3, 4.6, { c: '#333' });
-  if (state.sceneNames[k - 1]) text(`「${state.sceneNames[k - 1]}」`, L + 33 + x + 2, 30.5, 6, { w: 700, max: R - (L + 37 + x) - 58 });
-  text(POS.slice().reverse().map(p => `${p.label} ${list(p.key).length}人`).join('　'), R, 30.3, 3.2, { a: 'right', c: '#555' });
+  x = text(`／ 全${N}場面`, L + 33, 30.3, 4.6, { c: '#333' });
+  if (state.sceneNames[k - 1]) text(`「${state.sceneNames[k - 1]}」`, L + 33 + x + 2, 30.5, 6, { w: 700, max: 55 });
+  text(P.map(p => `${p.label} ${list(p.key).length}人`).join('　'), R, 30.3, 3, { a: 'right', c: '#555', max: 100 });
 
   // ---- ステージ全体の枠・中央の壁・階段 ----
   const X0 = 12, Y0 = 38, BW = 186, BH = 246;
   ctx.strokeStyle = '#111'; ctx.lineWidth = 0.9 * mm; ctx.strokeRect(X0 * mm, Y0 * mm, BW * mm, BH * mm);
-  const col = (a, b) => ({ x: X0 + BW * a, w: BW * (b - a) });
-  const C = { w3: col(0.015, 0.225), w2: col(0.235, 0.445), w1: col(0.475, 0.665), stage: col(0.68, 0.985) };
   const WALL = X0 + BW * 0.46;
+  const C1 = { x: X0 + BW * 0.475, w: BW * 0.19 }, ST = { x: X0 + BW * 0.68, w: BW * 0.305 };
   ctx.lineWidth = 0.7 * mm; ctx.beginPath(); ctx.moveTo(WALL * mm, (Y0 + 16) * mm); ctx.lineTo(WALL * mm, (Y0 + BH) * mm); ctx.stroke();
   text('壁', WALL - 1.6, Y0 + BH - 3, 2.8, { c: '#666', a: 'right' });
-  text('階段', (C.w2.x + C.w1.x + C.w1.w) / 2 - 18, Y0 + 7, 4.2, { w: 700, a: 'center' });
-  arrow(C.w2.x + C.w2.w * 0.2, Y0 + 11, C.w1.x + C.w1.w * 0.75, Y0 + 11, 2.2, 5);
-  const ST = C.stage, stTop = Y0 + 16, stBot = Y0 + BH - 4;
+  text('階段', WALL - 10, Y0 + 7, 4.2, { w: 700, a: 'center' });
+  arrow(X0 + BW * 0.24, Y0 + 11, C1.x + C1.w * 0.75, Y0 + 11, 2.2, 5);
+  const stTop = Y0 + 16, stBot = Y0 + BH - 4;
   rect(ST.x, stTop, ST.w, stBot - stTop, '#fbfaff', '#111', 0.5);
 
-  // ---- 待機列：いちばん人数の多い列に合わせて、文字の大きさをそろえる ----
-  const qTop = Y0 + 30, qBot = Y0 + BH - 10;
-  const maxQ = Math.max(1, ...['w3', 'w2', 'w1'].map(key => list(key).length));
-  const lh = Math.min(8.2, (qBot - qTop) / maxQ);
-  const fs = Math.max(2.4, Math.min(4.9, lh * 0.64));
-  const header = (key, y) => {
-    const p = POSMAP[key], c = C[key];
-    rect(c.x, y - 5.2, c.w, 7.2, p.color, null, 0, 1.4);
-    text(`${p.label}（${list(key).length}人）`, c.x + 1.6, y, 4, { w: 700, c: '#fff', max: c.w - 3 });
+  // ---- 後ろの待機列（待機2・待機3…）の置き場所：壁の側から外へ。多いときは上下に段を分ける ----
+  const back = P.filter(p => /^w\d+$/.test(p.key) && p.key !== 'w1');
+  const m = back.length;
+  // 1段に3列まで（名前が小さくなりすぎないように）。4列目からは次の段へ
+  const rows = m ? Math.ceil(m / 3) : 1, cols = m ? Math.ceil(m / rows) : 1;
+  const areaL = X0 + 1.5, areaR = WALL - 2, areaT = Y0 + 16, areaB = Y0 + BH - 3;
+  const cellW = (areaR - areaL) / cols, cellH = (areaB - areaT) / rows;
+  const cells = back.map((p, i) => {
+    const r = Math.floor(i / cols), c = i % cols;
+    return { p, x: areaR - (c + 1) * cellW + 0.6, w: cellW - 1.2, top: areaT + r * cellH, h: cellH };
+  });
+
+  // ---- 文字の大きさ：いちばん詰まっている列に合わせて、全部そろえる ----
+  const backLh = cells.length ? Math.min(...cells.map(c => (c.h - 14) / Math.max(1, list(c.p.key).length))) : 9;
+  const q1Top = Y0 + 30, q1Bot = Y0 + BH - 10;
+  const w1Lh = (q1Bot - q1Top) / Math.max(1, list('w1').length);
+  const lh = Math.max(2.6, Math.min(8.2, backLh, w1Lh));
+  const fs = Math.max(2.2, Math.min(4.9, lh * 0.64));
+  const head = (p, x, y, w) => {
+    rect(x, y - 5.2, w, 7.2, p.color, null, 0, 1.4);
+    text(`${p.label}（${list(p.key).length}人）`, x + 1.4, y, 3.9, { w: 700, c: '#fff', max: w - 2.5 });
   };
-  const nameAt = (key, i, y) => {
-    const p = POSMAP[key], c = C[key];
-    rect(c.x, y - lh * 0.8, 1.2, lh * 0.95, p.color, null, 0, 0.4);
-    text(String(i + 1), c.x + 2.2, y, fs * 0.62, { c: '#888' });
-    text(nameOf(list(key)[i]), c.x + 6, y, fs, { w: 500, max: c.w - 7 });
+  const nameAt = (p, i, x, w, y) => {
+    rect(x, y - lh * 0.8, 1.1, lh * 0.95, p.color, null, 0, 0.4);
+    text(String(i + 1), x + 2, y, fs * 0.6, { c: '#888' });
+    text(nameOf(list(p.key)[i]), x + 5.6, y, fs, { w: 500, max: w - 6 });
   };
-  // 待機3・待機2（先頭は上）
-  for (const key of ['w3', 'w2']) {
-    header(key, Y0 + 21);
-    text('先頭 ↑', C[key].x + C[key].w - 0.5, Y0 + 26.2, 2.8, { a: 'right', c: '#555' });
-    list(key).forEach((id, i) => nameAt(key, i, qTop + lh * (i + 0.75)));
+  // 後ろの待機列（上が先頭）
+  for (const c of cells) {
+    head(c.p, c.x, c.top + 5.6, c.w);
+    text('先頭 ↑', c.x + c.w - 0.3, c.top + 10.6, 2.6, { a: 'right', c: '#555' });
+    list(c.p.key).forEach((id, i) => nameAt(c.p, i, c.x, c.w, c.top + 13 + lh * (i + 0.75)));
+    if (rows > 1 && c.top > areaT) { ctx.strokeStyle = '#ccc'; ctx.lineWidth = 0.25 * mm; ctx.beginPath(); ctx.moveTo(c.x * mm, (c.top - 0.6) * mm); ctx.lineTo((c.x + c.w) * mm, (c.top - 0.6) * mm); ctx.stroke(); }
   }
-  // 音響待機1（先頭は下。下からステージへ進む）
-  header('w1', Y0 + 21);
-  text('先頭 ↓', C.w1.x + 1, stBot - 1.2, 3.2, { w: 700 });
-  arrow(C.w1.x + 15, stBot - 2.3, ST.x - 1.2, stBot - 2.3, 0.8, 2.4);
-  list('w1').forEach((id, i) => nameAt('w1', i, qBot - lh * (i + 0.25)));
+  // 音響待機1（下が先頭。下からステージへ進む）
+  const p1 = P.find(p => p.key === 'w1');
+  if (p1) {
+    head(p1, C1.x, Y0 + 21, C1.w);
+    text('先頭 ↓', C1.x + 1, stBot - 1.2, 3.2, { w: 700 });
+    arrow(C1.x + 15, stBot - 2.3, ST.x - 1.2, stBot - 2.3, 0.8, 2.4);
+    list('w1').forEach((id, i) => nameAt(p1, i, C1.x, C1.w, q1Bot - lh * (i + 0.25)));
+  }
 
   // ---- ステージ：四角の中に等間隔で並べる ----
-  const sp = POSMAP.stage, st = list('stage');
+  const sp = P[0], st = list('stage');
   rect(ST.x + 2, stTop + 3, ST.w - 4, 8, sp.color, null, 0, 1.4);
   text(`ステージ（${st.length}人）`, ST.x + ST.w / 2, stTop + 8.9, 4.4, { w: 700, c: '#fff', a: 'center' });
   if (st.length) {
     const top = stTop + 14, bot = stBot - 3;
-    const cols = st.length > 18 ? 2 : 1;
-    const per = Math.ceil(st.length / cols);
+    const ncol = st.length > 18 ? 2 : 1;
+    const per = Math.ceil(st.length / ncol);
     const slot = (bot - top) / per;
-    const sfs = Math.max(2.6, Math.min(cols === 2 ? 4.4 : 5.4, slot * 0.6));
-    const cw = (ST.w - 4) / cols;
+    const sfs = Math.max(2.6, Math.min(ncol === 2 ? 4.4 : 5.4, slot * 0.6));
+    const cw = (ST.w - 4) / ncol;
     st.forEach((id, i) => {
       const c = Math.floor(i / per), r = i % per;
-      const cx = ST.x + 2 + cw * c + cw / 2;
-      const cy = top + slot * (r + 0.5) + sfs * 0.35;
-      text(nameOf(id), cx, cy, sfs, { w: 500, a: 'center', max: cw - 2 });
+      text(nameOf(id), ST.x + 2 + cw * c + cw / 2, top + slot * (r + 0.5) + sfs * 0.35, sfs, { w: 500, a: 'center', max: cw - 2 });
     });
   } else {
     text('（まだ選ばれていません）', ST.x + ST.w / 2, stTop + 24, 3.4, { a: 'center', c: '#c92a2a' });
   }
-  // ---- 下のメモ ----
-  text('番号は列の先頭からの順番。待機2・待機3は上が先頭、音響待機1は下が先頭です。', X0, Y0 + BH + 5.5, 2.8, { c: '#555', max: BW - 25 });
-  text(`${k} / ${state.sceneCount}`, X0 + BW, Y0 + BH + 5.5, 3.2, { a: 'right', c: '#555' });
+  text('番号は列の先頭からの順番。後ろの待機列は上が先頭、音響待機1は下が先頭です。', X0, Y0 + BH + 5.5, 2.8, { c: '#555', max: BW - 25 });
+  text(`${k} / ${N}`, X0 + BW, Y0 + BH + 5.5, 3.2, { a: 'right', c: '#555' });
   ctx.restore();
 }
 
@@ -439,7 +456,8 @@ function renderEditor() {
       <button type="button" id="tCopy">← 前の場面と同じにする</button>
       <button type="button" id="tClear">この場面を空にする</button>
     </div>
-    <div class="boxes" id="boxes"></div>
+    <div class="posbar" id="posbar"></div>
+    <div class="panel" id="panel"></div>
     <div class="picker">
       <div class="ptitle"><span>名前をタップすると <b id="activeName"></b> に入ります（もう一度タップで外れます）</span>
         <label class="chk"><input type="checkbox" id="onlyLeft" ${onlyLeft ? 'checked' : ''}> まだ入っていない子だけ</label></div>
@@ -464,33 +482,41 @@ function renderTabs() {
   t.querySelectorAll('[data-k]').forEach(b => b.onclick = () => { state.cur = +b.dataset.k; save(); renderScene(); });
   t.querySelector('.on')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
+let sortable = null;
 function renderBoxes() {
-  const s = scene(state.cur);
-  $('boxes').innerHTML = POS.map(p => `
-    <div class="pbox ${p.key === active ? 'on' : ''}" style="--c:${p.color}" data-p="${p.key}" role="button" tabindex="0" aria-pressed="${p.key === active}">
-      <div class="ph">${p.label}<small>${s[p.key].length}人</small></div>
-      <div class="pnote">${p.note}</div>
-      <ol>${s[p.key].filter(id => nameOf(id)).map((id, i, arr) => `<li><span class="no">${i + 1}</span><span class="nm">${esc(nameOf(id))}</span>
-        ${i > 0 ? `<button type="button" data-up="${id}" data-from="${p.key}" title="先頭の方へ">↑</button>` : ''}<button type="button" data-rm="${id}" title="外す">✕</button></li>`).join('')}</ol>
-      <div class="here">${p.key === active ? '▼ ここに入れます' : 'タップでここに入れる'}</div>
-    </div>`).join('');
-  $('boxes').querySelectorAll('.pbox').forEach(b => b.addEventListener('click', e => {
-    if (e.target.closest('button')) return;
-    active = b.dataset.p; renderBoxes(); renderNames();
-  }));
-  $('boxes').querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { const k = posOf(state.cur, b.dataset.rm); if (k) assign(state.cur, b.dataset.rm, k); renderScene(); });
-  $('boxes').querySelectorAll('[data-up]').forEach(b => b.onclick = () => {
-    const arr = scene(state.cur)[b.dataset.from]; const i = arr.indexOf(b.dataset.up);
-    if (i > 0) { [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]; save(); renderBoxes(); renderPreview(); }
-  });
+  const s = scene(state.cur), P = positions();
+  if (!P.some(p => p.key === active)) active = 'stage';
+  // 場所を選ぶボタン（ステージ → 音響待機1 → 待機2 …）
+  $('posbar').innerHTML = P.map(p => `<button type="button" class="${p.key === active ? 'on' : ''}" style="--c:${p.color}" data-p="${p.key}">${p.label}<small>${s[p.key].filter(id => nameOf(id)).length}人</small></button>`).join('');
+  $('posbar').querySelectorAll('[data-p]').forEach(b => b.onclick = () => { active = b.dataset.p; renderBoxes(); renderNames(); });
+  // 選んでいる場所の中身だけを出す
+  const p = P.find(x => x.key === active), ids = s[active].filter(id => nameOf(id));
+  const panel = $('panel'); panel.style.setProperty('--c', p.color);
+  panel.innerHTML = `<div class="ph">${p.label}（${ids.length}人）<small>${p.note}</small></div>
+    ${ids.length ? `<div class="howto">≡ を長押ししてつまむと、上下に動かして順番を変えられます。番号は列の先頭からの順番です。</div>` : ''}
+    <ol id="plist">${ids.map((id, i) => `<li data-id="${id}"><span class="grip" aria-hidden="true">≡</span><span class="no">${i + 1}</span><span class="nm">${esc(nameOf(id))}</span><button type="button" data-rm="${id}" title="外す" aria-label="${esc(nameOf(id))}を外す">✕</button></li>`).join('')}</ol>
+    ${ids.length ? '' : '<div class="emptyl">まだ誰も入っていません。下の名簿から名前をタップしてください。</div>'}`;
+  panel.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { assign(state.cur, b.dataset.rm, active); renderScene(); });
+  if (sortable) { sortable.destroy(); sortable = null; }
+  if (window.Sortable && ids.length > 1) {
+    sortable = Sortable.create($('plist'), {
+      animation: 150, handle: '.grip, .nm, .no', delay: 120, delayOnTouchOnly: true, touchStartThreshold: 4,
+      onEnd: () => {
+        const order = [...$('plist').children].map(li => li.dataset.id);
+        const rest = scene(state.cur)[active].filter(id => !order.includes(id));
+        scene(state.cur)[active] = [...order, ...rest]; save();
+        renderBoxes(); renderPreview();
+      },
+    });
+  }
 }
 function renderNames() {
-  const p = POSMAP[active];
+  const p = posInfo(active);
   $('activeName').textContent = `「${p.label}」`; $('activeName').style.color = p.color;
   const left = state.roster.filter(r => !posOf(state.cur, r.id));
   const shown = onlyLeft ? left : state.roster;
   $('names').innerHTML = shown.map(r => {
-    const k = posOf(state.cur, r.id); const q = k && POSMAP[k];
+    const k = posOf(state.cur, r.id); const q = k && posInfo(k);
     return `<button type="button" data-id="${r.id}" class="${k ? 'placed' : ''} ${k === active ? 'here' : ''}" style="--c:${q ? q.color : '#999'}">${esc(r.name)}${q ? `<span class="tag">${q.label}</span>` : ''}</button>`;
   }).join('') || '<div class="hint">全員、どこかに入っています。</div>';
   $('names').querySelectorAll('[data-id]').forEach(b => b.onclick = () => { assign(state.cur, b.dataset.id, active); renderTabs(); renderBoxes(); renderNames(); renderPreview(); });
@@ -500,7 +526,7 @@ function renderNames() {
 }
 function copyPrev() {
   const k = state.cur; if (k <= 1) { toast('場面1には前の場面がありません'); return; }
-  const doIt = () => { const p = scene(k - 1); state.scenes[k] = Object.fromEntries(POS.map(x => [x.key, [...p[x.key]]])); save(); renderScene(); toast(`場面${k - 1}と同じ並びにしました。ここから入れ替えてください`); };
+  const doIt = () => { const p = scene(k - 1); state.scenes[k] = Object.fromEntries(positions().map(x => [x.key, [...p[x.key]]])); save(); renderScene(); toast(`場面${k - 1}と同じ並びにしました。ここから入れ替えてください`); };
   if (placedCount(k)) confirmDlg(`場面${k}を、場面${k - 1}と同じ並びにしますか？`, `場面${k}で入れた内容は、場面${k - 1}の並びで置きかわります。`, '同じにする', doIt);
   else doIt();
 }
@@ -605,7 +631,9 @@ function setCount(n) {
 }
 $('scMinus').onclick = () => {
   const n = state.sceneCount - 1; if (n < 1) return;
-  if (placedCount(state.sceneCount)) confirmDlg(`場面${state.sceneCount}を減らしますか？`, `場面${state.sceneCount}で入れた並びは使われなくなります（場面を増やし直すと戻ります）。`, '減らす', () => setCount(n));
+  const lastLine = 'w' + (state.sceneCount - 1);
+  const used = placedCount(state.sceneCount) || Object.values(state.scenes).some(sc => (sc[lastLine] || []).length);
+  if (used) confirmDlg(`場面${state.sceneCount}を減らしますか？`, `場面${state.sceneCount}と、「待機${state.sceneCount - 1}」の列に入れた子は使われなくなります（場面を増やし直すと戻ります）。`, '減らす', () => setCount(n));
   else setCount(n);
 };
 $('scPlus').onclick = () => { if (state.sceneCount >= MAX_SCENES) { toast(`場面は${MAX_SCENES}までです`); return; } setCount(state.sceneCount + 1); };
