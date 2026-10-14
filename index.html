@@ -109,6 +109,8 @@ section h2 small{font:400 .76rem var(--f-body);color:var(--muted)}
 .legend i{display:inline-block;background:var(--net);color:#fff;font-style:normal;font-size:.6rem;font-weight:700;padding:0 6px;border-radius:999px;margin-right:4px;vertical-align:1px}
 .privacy{background:var(--accent-soft);border-radius:14px;padding:12px 16px;font-size:.84rem;line-height:1.7}
 .privacy b{color:var(--accent)}
+.adminlink{text-align:center;margin:4px 0 0;font-size:.8rem}
+.adminlink a{color:var(--muted);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:6px 14px;display:inline-block}
 
 /* ---- ダイアログ・お知らせ ---- */
 dialog{border:0;border-radius:20px;padding:0;max-width:440px;width:calc(100% - 32px);background:var(--surface);color:var(--ink);box-shadow:0 20px 50px rgba(0,0,0,.3)}
@@ -141,6 +143,8 @@ dialog::backdrop{background:rgba(0,0,0,.4)}
 <dialog id="dlg"></dialog>
 <div id="toast" role="status"></div>
 
+<!-- アプリの一覧（先生用・管理者用のメニューで共通） -->
+<script src="common/apps.js"></script>
 <script>
 'use strict';
 let L = null; // 共通部品（common/license.js）が読み込まれてから入る
@@ -300,21 +304,10 @@ function showBlocked(kind, pl) {
 }
 
 /* ---------- メニュー ---------- */
-const ICONS = {
-  oyugikai: '<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="5" width="40" height="5" rx="2" fill="#ffd8e4"/><path d="M5 9h11c-1 8-1 17 2 27H5z" fill="#ff8fa3"/><path d="M43 9H32c1 8 1 17-2 27h13z" fill="#ff8fa3"/><path d="M4 36h40v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" fill="#fff"/><circle cx="18.5" cy="25" r="3.2" fill="#fff"/><path d="M14 36c0-4 2-7 4.5-7s4.5 3 4.5 7z" fill="#fff"/><circle cx="29.5" cy="25" r="3.2" fill="#ffd23f"/><path d="M25 36c0-4 2-7 4.5-7s4.5 3 4.5 7z" fill="#ffd23f"/></svg>',
-  nandemo: '<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="5" width="32" height="30" rx="3.5" fill="#fff"/><rect x="11.5" y="8.5" width="25" height="23" rx="2" fill="none" stroke="#d9dfe1" stroke-width="1.6"/><path d="M16 15h16M16 20.5h16M19 26h10" stroke="#b9c2c5" stroke-width="2.4" stroke-linecap="round"/><path d="M19.6 37 17 46l3.8-1.9 2.4 3.3 1.2-8.6zM28.4 37 31 46l-3.8-1.9-2.4 3.3-1.2-8.6z" fill="#ff8fa3"/><circle cx="24" cy="34" r="7" fill="#ff6b81" stroke="#fff" stroke-width="2.4"/><circle cx="24" cy="34" r="3" fill="#fff"/><path d="M40.5 2.5l1.2 3.1 3.1 1.2-3.1 1.2-1.2 3.1-1.2-3.1-3.1-1.2 3.1-1.2z" fill="#ffd23f"/></svg>',
-  marathon: '<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="7" y="6" width="27" height="33" rx="3.5" fill="#fff"/><path d="M12.5 14h16M12.5 20h16M12.5 26h9" stroke="#e8a35c" stroke-width="2.6" stroke-linecap="round"/><path d="M30.2 36.5 27.4 45l3.8-1.7 2.3 3.2 1.4-8.2zM39.8 36.5l2.8 8.5-3.8-1.7-2.3 3.2-1.4-8.2z" fill="#fff"/><circle cx="35" cy="32" r="8" fill="#ffd23f" stroke="#fff" stroke-width="2.6"/><path d="m35 27.6 1.35 2.75 3.03.44-2.19 2.13.52 3.02L35 34.52l-2.71 1.42.52-3.02-2.19-2.13 3.03-.44z" fill="#fff"/></svg>',
-  busroute: '<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="11" width="40" height="24" rx="6" fill="#fff"/><rect x="8.5" y="15.5" width="7.5" height="7.5" rx="1.8" fill="#8fbf62"/><rect x="19" y="15.5" width="7.5" height="7.5" rx="1.8" fill="#8fbf62"/><rect x="29.5" y="15.5" width="10" height="9.5" rx="1.8" fill="#8fbf62"/><rect x="4" y="27.5" width="40" height="2.6" fill="#cfe3b9"/><circle cx="41" cy="31.5" r="1.6" fill="#ffd23f"/><circle cx="14" cy="35.5" r="5" fill="#33413a" stroke="#fff" stroke-width="2.6"/><circle cx="34" cy="35.5" r="5" fill="#33413a" stroke="#fff" stroke-width="2.6"/></svg>',
-};
-// 準備中のアプリ（できあがったら APPS に移す）
-const SOON = [
-  { id: 'nandemo', name: 'なんでも賞状', n: 'なんでも<br>賞状' },
-];
-const APPS = [
-  { id: 'marathon', n: 'マラソン大会<br>表彰状', color: 'var(--c-shou)', href: 'marathon/' },
-  { id: 'busroute', n: 'バスルート<br>計画', color: 'var(--c-jimu)', href: 'busroute/', net: true },
-  { id: 'oyugikai', n: 'お遊戯会<br>立ち位置', color: '#7048e8', href: 'oyugikai/' },
-];
+// アプリの一覧は common/apps.js（先生用・管理者用のメニューで共通）。ここには先生用（for: 'all'）だけを出す
+const DA = window.DouguApps;
+const ICONS = DA.ICONS, SOON = DA.SOON;
+const APPS = DA.forTeachers().map(a => ({ ...a, href: a.path }));
 function showMenu(pl) {
   const near = L.loginRequired && daysLeft(pl) <= 7;
   show(`<div class="wrap">
@@ -330,13 +323,14 @@ function showMenu(pl) {
         return ok ? `<a class="app" href="${a.href}">${a.net ? '<em class="net">ネット</em>' : ''}<span class="tile" style="background:${a.color}">${ICONS[a.id]}</span><span>${a.n}</span></a>`
           : `<button class="app locked" type="button" data-lock="${a.id}"><em class="lock">🔒</em><span class="tile">${ICONS[a.id]}</span><span>${a.n}</span></button>`;
       }).join('')}</div>
-      <p class="legend"><span><i>ネット</i>地図などのためにインターネットを使うアプリ（園児の情報は送りません）</span>${APPS.some(a => !pl.apps.includes(a.id)) ? '<span>🔒 今のプランでは使えないアプリ</span>' : ''}</p>
+      <p class="legend">${APPS.some(a => a.net) ? '<span><i>ネット</i>地図などのためにインターネットを使うアプリ（園児の情報は送りません）</span>' : ''}${APPS.some(a => !pl.apps.includes(a.id)) ? '<span>🔒 今のプランでは使えないアプリ</span>' : ''}</p>
     </section>
     <section>
       <h2>準備中のアプリ <small>これから増えていきます</small></h2>
       <div class="grid">${SOON.map(a => `<button class="app soon" type="button" data-soon="${esc(a.name)}"><em class="badge">準備中</em><span class="tile">${ICONS[a.id]}</span><span>${a.n}</span></button>`).join('')}</div>
     </section>
     <div class="privacy">🔒 名簿・印鑑・コースなど、アプリで使うデータは<b>この端末（iPad・パソコン）の中だけ</b>に保存されます。どうぐばこのサーバーに送られることはありません。</div>
+    <p class="adminlink"><a href="kanri/">🔑 管理者用どうぐばこ</a></p>
   </div>`);
   $('#chip')?.addEventListener('click', () => accountDialog(pl));
   document.querySelectorAll('[data-soon]').forEach(b => b.onclick = () => toast(`「${b.dataset.soon}」は準備中です。できあがったら、ここから使えるようになります`, 3200));
