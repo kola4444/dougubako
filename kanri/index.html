@@ -61,6 +61,8 @@ section h2 small{font:400 .76rem var(--f-body);color:var(--muted)}
 .card input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .btn{border:0;border-radius:999px;padding:12px 20px;font-weight:700;cursor:pointer;background:var(--accent);color:var(--accent-ink);font-size:1rem}
 .btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line);font-weight:400;font-size:.85rem;padding:8px 16px}
+.show{display:flex;align-items:center;justify-content:center;gap:8px;font-size:.88rem;color:var(--muted);cursor:pointer}
+.show input{width:20px;height:20px;margin:0}
 .err{background:var(--bad-soft);color:var(--bad);border-radius:10px;padding:9px 12px;font-size:.85rem;text-align:center}
 .foot{text-align:center}
 </style>
@@ -77,17 +79,19 @@ const D = window.DouguApps;
 const $ = s => document.querySelector(s);
 const tile = a => `<a class="app" href="../${a.path}">${a.net ? '<em class="net">ネット</em>' : ''}<span class="tile" style="background:${a.color}">${D.ICONS[a.id] || ''}</span><span>${a.n}</span></a>`;
 
-// 合言葉を入れる画面
+// パスワードを入れる画面
 function showGate(err) {
   $('#screen').innerHTML = `<div class="center"><form class="card" id="fGate" autocomplete="off">
     <img class="logo" src="../icon.svg" alt="">
     <h2>管理者用どうぐばこ</h2>
-    <p>園長・管理職の方のためのページです。<br>合言葉を入れてください。</p>
-    ${err ? '<div class="err">合言葉が違います。もう一度入れてください。</div>' : ''}
-    <input type="password" id="pass" aria-label="合言葉" placeholder="合言葉" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <p>園長・管理職の方のためのページです。<br>パスワードを入れてください。</p>
+    ${err ? '<div class="err">パスワードが違います。もう一度入れてください。</div>' : ''}
+    <input type="password" id="pass" aria-label="パスワード" placeholder="パスワード" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <label class="show"><input type="checkbox" id="showPass"> パスワードを表示する</label>
     <button class="btn" type="submit">開く</button>
     <p style="font-size:.78rem">一度入れると、この端末では次から聞かれません。</p>
   </form></div>`;
+  $('#showPass').onchange = e => { $('#pass').type = e.target.checked ? 'text' : 'password'; $('#pass').focus(); };
   $('#fGate').onsubmit = async e => {
     e.preventDefault();
     const ok = await D.tryPasscode($('#pass').value);
@@ -112,7 +116,7 @@ function showMenu() {
       <h2>みんなのアプリ <small>先生用のどうぐばこと同じもの</small></h2>
       <div class="grid">${all.map(tile).join('')}</div>
     </section>
-    <div class="foot"><button class="btn ghost" id="lock" type="button">🔒 この端末の合言葉を消す</button></div>
+    <div class="foot"><button class="btn ghost" id="lock" type="button">🔒 この端末のパスワードを消す</button></div>
   </div>`;
   $('#lock').onclick = () => { D.adminLogout(); showGate(); };
 }
