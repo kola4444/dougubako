@@ -92,6 +92,11 @@ details.scnames summary{cursor:pointer;color:var(--accent);font-size:14px;margin
 .names button .tag{display:block;font-size:11px;color:#fff;background:var(--c);border-radius:4px;padding:0 5px;width:max-content;margin-top:2px}
 .names button.placed{background:#faf9fd}
 .names button.here{border:2px solid var(--c);background:color-mix(in srgb,var(--c) 10%,#fff)}
+.gapbox{border:1px dashed #7048e8;border-radius:10px;padding:8px 10px;margin:4px 0 10px;background:#faf8ff}
+.gapbox label{display:flex;gap:8px;align-items:flex-start;font-size:14px;cursor:pointer}
+.gapbox input[type=checkbox]{width:22px;height:22px;flex:none;margin-top:1px}
+.gapbox textarea{width:100%;margin-top:8px;font:inherit;font-size:16px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;min-height:64px;resize:vertical;background:#fff}
+.gapbox .gnote{font-size:12px;color:var(--muted);margin-top:4px}
 .left{background:var(--warnbg);color:var(--warn);border-radius:8px;padding:6px 10px;font-size:13px;margin-top:8px}
 .left.ok{background:#ebfbee;color:#2b8a3e}
 .chk{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
@@ -191,7 +196,7 @@ function positions(N = state.sceneCount) {
   return out;
 }
 const posInfo = key => positions(MAX_SCENES).find(p => p.key === key);
-function blank() { return { version: 2, className: '', title: '', sceneCount: 5, sceneNames: [], roster: [], scenes: {}, cur: 1 }; }
+function blank() { return { version: 2, className: '', title: '', sceneCount: 5, sceneNames: [], roster: [], scenes: {}, gaps: {}, cur: 1 }; }
 let state;
 try { state = JSON.parse(localStorage.getItem(LS_CUR)) || blank(); } catch (e) { state = blank(); }
 state = { ...blank(), ...state };
@@ -218,6 +223,8 @@ function assign(k, id, key) {
   if (was !== key) s[key].push(id);
   save();
 }
+// ステージから一度捌ける子の「行き来スペース」（場面ごと。音響待機1の先頭の前に入る）
+function gapOf(k) { if (!state.gaps) state.gaps = {}; return state.gaps[k] || (state.gaps[k] = { on: false, text: '' }); }
 const nameOf = id => (state.roster.find(r => r.id === id) || {}).name || '';
 const placedCount = k => { const s = scene(k); return positions().reduce((a, p) => a + s[p.key].filter(id => nameOf(id)).length, 0); };
 const sceneLabel = j => `場面${j}` + (state.sceneNames[j - 1] ? `「${state.sceneNames[j - 1]}」` : '');
@@ -384,10 +391,31 @@ function drawPage(cv, k) {
   const colLines = c => c.groups.reduce((a, g) => a + list(g.key).length + 2, 0);
   const backLh = backCols.length ? Math.min(...backCols.map(c => (areaB - areaT - 10) / Math.max(1, colLines(c)))) : 9;
   const q1Top = Y0 + 30, q1Bot = Y0 + BH - 10;
-  const w1Lh = (q1Bot - q1Top) / Math.max(1, list('w1').length);
-  const lh = Math.max(2.6, Math.min(8.2, backLh, w1Lh));
+  // 行き来スペース：文字は待機の子の名前と同じ大きさ。長い文は枠の中で折り返す
+  const gap = gapOf(k);
+  const wrapText = (str, width, size) => {
+    ctx.font = f(size * mm, 500); const out = [];
+    for (const para of String(str).split(/\n/)) {
+      let line = '';
+      for (const ch of para) { if (line && ctx.measureText(line + ch).width / mm > width) { out.push(line); line = ch; } else line += ch; }
+      out.push(line);
+    }
+    return out;
+  };
   const fs7 = Math.min(...[...backCols.map(c => c.w), C1.w].map(w => fitChars(w - NAME_PAD)));
-  const fs = Math.max(2.2, Math.min(fs7, lh * 0.74));
+  // 名前の大きさは列の詰まり具合で決まり、スペースの高さは文字の大きさで決まるので、何度か計算してそろえる
+  let gapLines = [], gapH = 0, w1Bot = q1Bot, lh = 8.2, fs = fs7;
+  for (let it = 0; it < 5; it++) {
+    const size = fs;
+    gapLines = gap.on && gap.text.trim() ? wrapText(gap.text.trim(), C1.w - 3, size) : [];
+    gapH = gap.on ? Math.max(2, gapLines.length) * size * 1.4 + 4 : 0;
+    w1Bot = q1Bot - gapH;   // 音響待機1の子は、スペースの分だけ上にずれる
+    const w1Lh = (w1Bot - q1Top) / Math.max(1, list('w1').length);
+    lh = Math.max(2.6, Math.min(8.2, backLh, w1Lh));
+    fs = Math.max(2.2, Math.min(fs7, lh * 0.74));
+    if (Math.abs(fs - size) < 0.02) break;
+  }
+  const fsC = fs;   // 行き来スペースのコメントは、待機の子の名前と同じ大きさ
   const head = (p, x, y, w) => {
     rect(x, y - 5.2, w, 7.2, p.color, null, 0, 1.4);
     text(`${p.label}（${list(p.key).length}人）`, x + 1.4, y, 3.9, { w: 700, c: '#fff', max: w - 2.5 });
@@ -413,7 +441,15 @@ function drawPage(cv, k) {
     head(p1, C1.x, Y0 + 21, C1.w);
     text('先頭 ↓', C1.x + 1, stBot - 1.2, 3.2, { w: 700 });
     arrow(C1.x + 15, stBot - 2.3, ST.x - 1.2, stBot - 2.3, 0.8, 2.4);
-    list('w1').forEach((id, i) => nameAt(p1, i, C1.x, C1.w, q1Bot - lh * (i + 0.25)));
+    if (gap.on) {
+      const gy = q1Bot - gapH + 1.5, gh = gapH - 0.5;
+      ctx.save(); ctx.setLineDash([1.6 * mm, 1.2 * mm]);
+      rect(C1.x, gy, C1.w, gh, '#f6f2ff', '#7048e8', 0.5, 1.2);
+      ctx.restore();
+      if (gapLines.length) gapLines.forEach((l, i) => text(l, C1.x + 1.5, gy + 2 + fsC * (1.1 + i * 1.4), fsC, { w: 500, c: '#2b2140', max: C1.w - 3 }));
+      else text('（ステージから戻る子のスペース）', C1.x + C1.w / 2, gy + gh / 2 + 1, 2.6, { a: 'center', c: '#7a6aa8', max: C1.w - 2 });
+    }
+    list('w1').forEach((id, i) => nameAt(p1, i, C1.x, C1.w, w1Bot - lh * (i + 0.25)));
   }
 
   // ---- ステージ：四角の中に等間隔で並べる ----
@@ -462,6 +498,7 @@ function renderEditor() {
       <button type="button" id="tCopy">← 前の場面と同じにする</button>
       <button type="button" id="tClear">この場面を空にする</button>
     </div>
+    <div class="gapbox" id="gapBox"></div>
     <div class="posbar" id="posbar"></div>
     <div class="panel" id="panel"></div>
     <div class="picker">
@@ -485,12 +522,20 @@ function keepPlace(id, fn) {
   const el = $(id);
   if (before != null && el) { const diff = el.getBoundingClientRect().top - before; if (Math.abs(diff) > 1) window.scrollBy(0, diff); }
 }
-function renderScene() { renderTabs(); renderBoxes(); renderNames(); renderPreview(); }
+function renderScene() { renderTabs(); renderGap(); renderBoxes(); renderNames(); renderPreview(); }
+function renderGap() {
+  const box = $('gapBox'); if (!box) return;
+  const g = gapOf(state.cur);
+  box.innerHTML = `<label><input type="checkbox" id="gapOn" ${g.on ? 'checked' : ''}><span>この場面は、ステージから一度捌けて戻ってくる子のために、<b>音響待機1の先頭の前に「行き来スペース」</b>を入れる</span></label>
+    ${g.on ? `<textarea id="gapText" placeholder="自由に書けます（例：うさぎ役の3人がここに戻る）">${esc(g.text)}</textarea><div class="gnote">PDFでは、音響待機1の先頭の前（ステージ側）に点線の枠で入り、音響待機1の子はその分だけ上にずれます。</div>` : ''}`;
+  $('gapOn').onchange = e => keepPlace('gapBox', () => { g.on = e.target.checked; save(); renderGap(); renderTabs(); renderPreview(); });
+  $('gapText')?.addEventListener('input', e => { g.text = e.target.value; save(); renderPreview(); });
+}
 function renderTabs() {
   const t = $('tabs'); if (!t) return;
   t.innerHTML = Array.from({ length: state.sceneCount }, (_, i) => {
     const k = i + 1;
-    return `<button type="button" class="${k === state.cur ? 'on' : ''}" data-k="${k}">場面${k}<small>${placedCount(k)}/${state.roster.length}人${state.sceneNames[i] ? '・' + esc(state.sceneNames[i]) : ''}</small></button>`;
+    return `<button type="button" class="${k === state.cur ? 'on' : ''}" data-k="${k}">場面${k}<small>${placedCount(k)}/${state.roster.length}人${gapOf(k).on ? '・行き来あり' : ''}${state.sceneNames[i] ? '・' + esc(state.sceneNames[i]) : ''}</small></button>`;
   }).join('');
   t.querySelectorAll('[data-k]').forEach(b => b.onclick = () => { state.cur = +b.dataset.k; save(); renderScene(); });
   const on = t.querySelector('.on');
@@ -540,7 +585,7 @@ function renderNames() {
 }
 function copyPrev() {
   const k = state.cur; if (k <= 1) { toast('場面1には前の場面がありません'); return; }
-  const doIt = () => { const p = scene(k - 1); state.scenes[k] = Object.fromEntries(positions().map(x => [x.key, [...p[x.key]]])); save(); renderScene(); toast(`場面${k - 1}と同じ並びにしました。ここから入れ替えてください`); };
+  const doIt = () => { const p = scene(k - 1); state.scenes[k] = Object.fromEntries(positions().map(x => [x.key, [...p[x.key]]])); state.gaps[k] = { ...gapOf(k - 1) }; save(); renderScene(); toast(`場面${k - 1}と同じ並びにしました。ここから入れ替えてください`); };
   if (placedCount(k)) confirmDlg(`場面${k}を、場面${k - 1}と同じ並びにしますか？`, `場面${k}で入れた内容は、場面${k - 1}の並びで置きかわります。`, '同じにする', doIt);
   else doIt();
 }
