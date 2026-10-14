@@ -26,11 +26,11 @@
     { id: 'nandemo', name: 'なんでも賞状', n: 'なんでも<br>賞状' },
   ];
 
-  /* ---------- 管理者用の合言葉 ----------
-     合言葉そのものは書かず、元に戻せない形（SHA-256）だけを置く。
-     合言葉を変えるときは、新しい合言葉の SHA-256 をここに入れる（Mac では  printf '%s' '合言葉' | shasum -a 256 ）。
+  /* ---------- 管理者用のパスワード ----------
+     パスワードそのものは書かず、元に戻せない形（SHA-256）だけを置く。
+     パスワードを変えるときは、新しいパスワードの SHA-256 をここに入れる（Mac では  printf '%s' 'パスワード' | shasum -a 256 ）。
      ※ 端末の中で確かめるだけなので、詳しい人が調べれば回り込める。「先生の目に触れないようにする」ためのもの */
-  const ADMIN_HASH = '8af0a5313c9af59e7f3fd8015dda45a499c0922d1f032dd167fb27647dca4de8';
+  const ADMIN_HASH = 'fd63da530e48ff21bdce404a1e0ac2e49a7c775dc9db9731d9fa67bce446b366';
   const ADMIN_KEY = 'dougubako.kanri.ok';
   async function sha256(text) {
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
@@ -54,7 +54,7 @@
       return ok;
     },
     adminLogout() { ls.del(ADMIN_KEY); },
-    // 管理者用のアプリを開いたとき、合言葉がまだならアプリの上に案内を出す（base はサイトのいちばん上への道すじ。例 '../'）
+    // 管理者用のアプリを開いたとき、パスワードがまだならアプリの上に案内を出す（base はサイトのいちばん上への道すじ。例 '../'）
     guardAdmin(appId, base) {
       if (!D.isAdminApp(appId) || D.adminOk()) return true;
       const ov = document.createElement('div');
@@ -63,7 +63,7 @@
       ov.innerHTML = `<div style="max-width:420px;width:100%;background:#fff;border:1px solid #d9e3df;border-radius:18px;padding:26px 22px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.08)">
         <img src="${base}icon.svg" alt="" style="width:72px;height:72px;border-radius:18px;display:block;margin:0 auto 12px">
         <div style="font-size:18px;font-weight:700;margin-bottom:8px">🔒 管理者用のアプリです</div>
-        <div style="font-size:14px;line-height:1.7;color:#5d6c70;margin-bottom:18px">「管理者用どうぐばこ」を開いて、合言葉を入れてから使ってください。</div>
+        <div style="font-size:14px;line-height:1.7;color:#5d6c70;margin-bottom:18px">「管理者用どうぐばこ」を開いて、パスワードを入れてから使ってください。</div>
         <a href="${base}kanri/" style="display:inline-block;background:#2f7d6b;color:#fff;text-decoration:none;font-weight:700;border-radius:999px;padding:10px 22px;font-size:15px">管理者用どうぐばこを開く</a></div>`;
       document.body.appendChild(ov);
       return false;
