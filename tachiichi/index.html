@@ -391,9 +391,8 @@ function drawPage(cv, k) {
   const colLines = c => c.groups.reduce((a, g) => a + list(g.key).length + 2, 0);
   const backLh = backCols.length ? Math.min(...backCols.map(c => (areaB - areaT - 10) / Math.max(1, colLines(c)))) : 9;
   const q1Top = Y0 + 30, q1Bot = Y0 + BH - 10;
-  // 行き来スペース：文字は「7文字が横に入る大きさ」。長い文は枠の中で折り返す
+  // 行き来スペース：文字は待機の子の名前と同じ大きさ。長い文は枠の中で折り返す
   const gap = gapOf(k);
-  const fsC = fitChars(C1.w - 3);
   const wrapText = (str, width, size) => {
     ctx.font = f(size * mm, 500); const out = [];
     for (const para of String(str).split(/\n/)) {
@@ -403,13 +402,20 @@ function drawPage(cv, k) {
     }
     return out;
   };
-  const gapLines = gap.on && gap.text.trim() ? wrapText(gap.text.trim(), C1.w - 3, fsC) : [];
-  const gapH = gap.on ? Math.max(2, gapLines.length) * fsC * 1.4 + 4 : 0;
-  const w1Bot = q1Bot - gapH;   // 音響待機1の子は、スペースの分だけ上にずれる
-  const w1Lh = (w1Bot - q1Top) / Math.max(1, list('w1').length);
-  const lh = Math.max(2.6, Math.min(8.2, backLh, w1Lh));
   const fs7 = Math.min(...[...backCols.map(c => c.w), C1.w].map(w => fitChars(w - NAME_PAD)));
-  const fs = Math.max(2.2, Math.min(fs7, lh * 0.74));
+  // 名前の大きさは列の詰まり具合で決まり、スペースの高さは文字の大きさで決まるので、何度か計算してそろえる
+  let gapLines = [], gapH = 0, w1Bot = q1Bot, lh = 8.2, fs = fs7;
+  for (let it = 0; it < 5; it++) {
+    const size = fs;
+    gapLines = gap.on && gap.text.trim() ? wrapText(gap.text.trim(), C1.w - 3, size) : [];
+    gapH = gap.on ? Math.max(2, gapLines.length) * size * 1.4 + 4 : 0;
+    w1Bot = q1Bot - gapH;   // 音響待機1の子は、スペースの分だけ上にずれる
+    const w1Lh = (w1Bot - q1Top) / Math.max(1, list('w1').length);
+    lh = Math.max(2.6, Math.min(8.2, backLh, w1Lh));
+    fs = Math.max(2.2, Math.min(fs7, lh * 0.74));
+    if (Math.abs(fs - size) < 0.02) break;
+  }
+  const fsC = fs;   // 行き来スペースのコメントは、待機の子の名前と同じ大きさ
   const head = (p, x, y, w) => {
     rect(x, y - 5.2, w, 7.2, p.color, null, 0, 1.4);
     text(`${p.label}（${list(p.key).length}人）`, x + 1.4, y, 3.9, { w: 700, c: '#fff', max: w - 2.5 });
