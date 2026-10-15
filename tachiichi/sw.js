@@ -6,7 +6,7 @@
    ・部品（lib/）とアイコンは、保存分を使う
    直したら VERSION を変える
    ============================================================ */
-const VERSION = '2026-10-14-3';
+const VERSION = '2026-10-15-1';
 const CACHE = 'tachiichi-' + VERSION;
 const CORE = [
   './',
