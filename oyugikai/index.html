@@ -97,6 +97,28 @@ details.scnames summary{cursor:pointer;color:var(--accent);font-size:14px;margin
 .gapbox input[type=checkbox]{width:22px;height:22px;flex:none;margin-top:1px}
 .gapbox textarea{width:100%;margin-top:8px;font:inherit;font-size:16px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;min-height:64px;resize:vertical;background:#fff}
 .gapbox .gnote{font-size:12px;color:var(--muted);margin-top:4px}
+/* フィナーレ */
+.tabs button.fin{border-color:#e8590c;color:#e8590c;font-weight:700}
+.tabs button.fin.on{background:#e8590c;border-color:#e8590c;color:#fff}
+.tabs button.fin small{color:inherit;opacity:.8}
+.finhead{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between;margin:6px 0 10px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{border:0;border-radius:0;min-height:40px;padding:4px 18px;background:#fff}
+.seg button.on{background:#2b2140;color:#fff;font-weight:700}
+.rowstep{display:flex;align-items:center;gap:6px;font-size:14px}
+.rowstep button{width:40px;min-height:38px;padding:0;font-size:18px}
+.rowstep b{min-width:28px;text-align:center;font-size:18px}
+.costs{display:flex;gap:6px;flex-wrap:wrap}
+.costs button{border:2px solid var(--c);background:color-mix(in srgb,var(--c) 18%,#fff);border-radius:10px;min-height:44px;padding:4px 12px;text-align:left;line-height:1.2}
+.costs button.on{box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 40%,transparent);font-weight:700}
+.costs button small{display:block;font-size:11px;color:var(--muted)}
+.costedit{border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px;display:grid;gap:8px}
+.costedit .row input{flex:1;min-width:0}
+.swatches{display:flex;gap:6px;flex-wrap:wrap}
+.swatches button{width:34px;height:34px;min-height:0;border-radius:50%;padding:0;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
+.swatches button.on{box-shadow:0 0 0 3px #2b2140}
+.names button.dress{background:color-mix(in srgb,var(--dc) 22%,#fff);border-color:var(--dc)}
+.names button .dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--dc);margin-right:4px;vertical-align:0}
 .left{background:var(--warnbg);color:var(--warn);border-radius:8px;padding:6px 10px;font-size:13px;margin-top:8px}
 .left.ok{background:#ebfbee;color:#2b8a3e}
 .chk{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
@@ -224,6 +246,30 @@ function assign(k, id, key) {
   save();
 }
 // ステージから一度捌ける子の「行き来スペース」（場面ごと。音響待機1の先頭の前に入る）
+// フィナーレ：場面の最後に、全員がステージに並ぶ（待機列なし・横向きのページ）
+const FIN_MAX_ROWS = 8;
+const COSTUME_COLORS = ['#f06595', '#4dabf7', '#51cf66', '#ff922b', '#9775fa', '#fcc419', '#20c997', '#e03131', '#a0785a', '#868e96', '#3bc9db', '#d6336c'];
+function finale() {
+  const f = state.finale || (state.finale = {});
+  if (!Number.isInteger(f.rows) || f.rows < 1) f.rows = 3;
+  if (!Array.isArray(f.lines)) f.lines = [];
+  while (f.lines.length < f.rows) f.lines.push([]);
+  if (!Array.isArray(f.costumes)) f.costumes = [];
+  if (!f.dress || typeof f.dress !== 'object') f.dress = {};
+  return f;
+}
+const finRowOf = id => finale().lines.slice(0, finale().rows).findIndex(l => l.includes(id));
+const finPlaced = () => finale().lines.slice(0, finale().rows).reduce((a, l) => a + l.filter(id => nameOf(id)).length, 0);
+const costumeOf = id => { const f = finale(); return f.costumes.find(c => c.id === f.dress[id]) || null; };
+const costumeNo = c => finale().costumes.indexOf(c) + 1;
+const circled = n => n >= 1 && n <= 20 ? String.fromCharCode(0x2460 + n - 1) : `(${n})`;
+// 名前：名（下の名前）だけを出す。同じ名の子がいるときは、上に小さく姓を出す
+function shortName(id) {
+  const full = nameOf(id).trim(); const parts = full.split(/[\s　]+/);
+  const given = parts.length > 1 ? parts.slice(1).join(' ') : full, sur = parts.length > 1 ? parts[0] : '';
+  const dup = state.roster.filter(r => { const q = r.name.trim().split(/[\s　]+/); return (q.length > 1 ? q.slice(1).join(' ') : r.name.trim()) === given; }).length > 1;
+  return { given, sur: dup ? sur : '' };
+}
 function gapOf(k) { if (!state.gaps) state.gaps = {}; return state.gaps[k] || (state.gaps[k] = { on: false, text: '' }); }
 const nameOf = id => (state.roster.find(r => r.id === id) || {}).name || '';
 const placedCount = k => { const s = scene(k); return positions().reduce((a, p) => a + s[p.key].filter(id => nameOf(id)).length, 0); };
@@ -494,6 +540,8 @@ function renderEditor() {
   if (!state.roster.length) { box.innerHTML = '<div class="empty">先に、1 でクラスの名簿を読み込んでください。</div>'; return; }
   box.innerHTML = `
     <div class="tabs" id="tabs"></div>
+    <div id="finaleEd" hidden></div>
+    <div id="sceneEd">
     <div class="tools">
       <button type="button" id="tCopy">← 前の場面と同じにする</button>
       <button type="button" id="tClear">この場面を空にする</button>
@@ -506,6 +554,7 @@ function renderEditor() {
         <label class="chk"><input type="checkbox" id="onlyLeft" ${onlyLeft ? 'checked' : ''}> まだ入っていない子だけ</label></div>
       <div class="names" id="names"></div>
       <div id="leftInfo"></div>
+    </div>
     </div>`;
   $('tCopy').onclick = copyPrev;
   $('tClear').onclick = () => {
@@ -522,7 +571,12 @@ function keepPlace(id, fn) {
   const el = $(id);
   if (before != null && el) { const diff = el.getBoundingClientRect().top - before; if (Math.abs(diff) > 1) window.scrollBy(0, diff); }
 }
-function renderScene() { renderTabs(); renderGap(); renderBoxes(); renderNames(); renderPreview(); }
+function renderScene() {
+  const fin = !!state.onFinale;
+  $('sceneEd').hidden = fin; $('finaleEd').hidden = !fin;
+  if (fin) { renderTabs(); renderFinale(); renderPreview(); return; }
+  renderTabs(); renderGap(); renderBoxes(); renderNames(); renderPreview();
+}
 function renderGap() {
   const box = $('gapBox'); if (!box) return;
   const g = gapOf(state.cur);
@@ -535,9 +589,10 @@ function renderTabs() {
   const t = $('tabs'); if (!t) return;
   t.innerHTML = Array.from({ length: state.sceneCount }, (_, i) => {
     const k = i + 1;
-    return `<button type="button" class="${k === state.cur ? 'on' : ''}" data-k="${k}">場面${k}<small>${placedCount(k)}/${state.roster.length}人${gapOf(k).on ? '・行き来あり' : ''}${state.sceneNames[i] ? '・' + esc(state.sceneNames[i]) : ''}</small></button>`;
-  }).join('');
-  t.querySelectorAll('[data-k]').forEach(b => b.onclick = () => { state.cur = +b.dataset.k; save(); renderScene(); });
+    return `<button type="button" class="${k === state.cur && !state.onFinale ? 'on' : ''}" data-k="${k}">場面${k}<small>${placedCount(k)}/${state.roster.length}人${gapOf(k).on ? '・行き来あり' : ''}${state.sceneNames[i] ? '・' + esc(state.sceneNames[i]) : ''}</small></button>`;
+  }).join('') + `<button type="button" class="fin ${state.onFinale ? 'on' : ''}" data-fin>🎉 フィナーレ<small>${finPlaced()}/${state.roster.length}人</small></button>`;
+  t.querySelectorAll('[data-k]').forEach(b => b.onclick = () => { state.cur = +b.dataset.k; state.onFinale = false; save(); renderScene(); });
+  t.querySelector('[data-fin]').onclick = () => { state.onFinale = true; save(); renderScene(); };
   const on = t.querySelector('.on');
   if (on && (on.offsetLeft < t.scrollLeft || on.offsetLeft + on.offsetWidth > t.scrollLeft + t.clientWidth)) t.scrollLeft = on.offsetLeft - t.clientWidth / 2 + on.offsetWidth / 2;
 }
@@ -583,6 +638,187 @@ function renderNames() {
     ? `<div class="left">この場面で、まだどこにも入っていない子：${left.length}人（${esc(left.slice(0, 6).map(r => r.name).join('、'))}${left.length > 6 ? ' …' : ''}）</div>`
     : `<div class="left ok">✓ この場面は、クラス全員がどこかに入っています</div>`;
 }
+let finMode = 'line', finRow = 0, finCost = null, finSortable = null;
+function renderFinale() {
+  const f = finale(), box = $('finaleEd');
+  if (finRow >= f.rows) finRow = 0;
+  if (finCost && !f.costumes.some(c => c.id === finCost)) finCost = null;
+  if (!finCost && f.costumes.length) finCost = f.costumes[0].id;
+  box.innerHTML = `
+    <div class="finhead">
+      <div class="seg"><button type="button" data-fm="line" class="${finMode === 'line' ? 'on' : ''}">並び</button><button type="button" data-fm="dress" class="${finMode === 'dress' ? 'on' : ''}">衣装</button></div>
+      ${finMode === 'line' ? `<div class="rowstep">列の数 <button type="button" id="frMinus" aria-label="列を減らす">−</button><b>${f.rows}</b><button type="button" id="frPlus" aria-label="列を増やす">＋</button></div>` : ''}
+    </div>
+    <div id="finBody"></div>
+    <div class="picker">
+      <div class="ptitle"><span id="finHow"></span>
+        <label class="chk"><input type="checkbox" id="finOnlyLeft" ${onlyLeft ? 'checked' : ''}> まだの子だけ</label></div>
+      <div class="names" id="fnames"></div>
+      <div id="finLeft"></div>
+    </div>`;
+  box.querySelectorAll('[data-fm]').forEach(b => b.onclick = () => { finMode = b.dataset.fm; renderFinale(); });
+  $('finOnlyLeft').onchange = e => { onlyLeft = e.target.checked; renderFinNames(); };
+  if (finMode === 'line') {
+    $('frMinus').onclick = () => {
+      if (f.rows <= 1) return;
+      const last = f.lines[f.rows - 1].filter(id => nameOf(id));
+      const doIt = () => { f.lines[f.rows - 1] = []; f.rows--; save(); renderFinale(); renderTabs(); renderPreview(); };
+      if (last.length) confirmDlg(`${f.rows}列目を減らしますか？`, `${f.rows}列目に並べた${last.length}人は、どこにも並んでいない状態になります。`, '減らす', doIt); else doIt();
+    };
+    $('frPlus').onclick = () => { if (f.rows >= FIN_MAX_ROWS) { toast(`列は${FIN_MAX_ROWS}列までです`); return; } f.rows++; finale(); save(); renderFinale(); renderPreview(); };
+  }
+  renderFinBody(); renderFinNames();
+}
+function renderFinBody() {
+  const f = finale(), body = $('finBody');
+  if (finMode === 'line') {
+    body.innerHTML = `<div class="posbar">${f.lines.slice(0, f.rows).map((l, i) => `<button type="button" class="${i === finRow ? 'on' : ''}" style="--c:#7048e8" data-r="${i}">${i + 1}列目<small>${l.filter(id => nameOf(id)).length}人</small></button>`).join('')}</div>
+      <div class="panel" id="fpanel" style="--c:#7048e8"></div>`;
+    body.querySelectorAll('[data-r]').forEach(b => b.onclick = () => keepPlace('fnames', () => { finRow = +b.dataset.r; renderFinBody(); renderFinNames(); }));
+    const ids = f.lines[finRow].filter(id => nameOf(id));
+    $('fpanel').innerHTML = `<div class="ph">${finRow + 1}列目（${ids.length}人）<small>${finRow === 0 ? 'PDFでいちばん上の列' : finRow === f.rows - 1 ? 'PDFでいちばん下の列' : ''}</small></div>
+      ${ids.length ? '<div class="howto">上から順に、PDFでは左から右へ並びます。中心線から左右均等に配置されます。≡ を長押ししてつまむと順番を変えられます。</div>' : ''}
+      <ol id="flist">${ids.map((id, i) => { const c = costumeOf(id); return `<li data-id="${id}"><span class="grip" aria-hidden="true">≡</span><span class="no">${i + 1}</span><span class="nm">${c ? `<span class="dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${c.color};margin-right:4px"></span>` : ''}${esc(nameOf(id))}</span><button type="button" data-rm="${id}" aria-label="外す">✕</button></li>`; }).join('')}</ol>
+      ${ids.length ? '' : '<div class="emptyl">まだ誰も並んでいません。下の名簿から名前をタップしてください。</div>'}`;
+    $('fpanel').querySelectorAll('[data-rm]').forEach(b => b.onclick = () => keepPlace('fnames', () => { const l = f.lines[finRow]; l.splice(l.indexOf(b.dataset.rm), 1); save(); renderFinBody(); renderFinNames(); renderTabs(); renderPreview(); }));
+    if (finSortable) { finSortable.destroy(); finSortable = null; }
+    if (window.Sortable && ids.length > 1) finSortable = Sortable.create($('flist'), {
+      animation: 150, handle: '.grip, .nm, .no', delay: 120, delayOnTouchOnly: true, touchStartThreshold: 4,
+      onEnd: () => { const order = [...$('flist').children].map(li => li.dataset.id); f.lines[finRow] = [...order, ...f.lines[finRow].filter(id => !order.includes(id))]; save(); renderFinBody(); renderPreview(); },
+    });
+  } else {
+    const cur = f.costumes.find(c => c.id === finCost);
+    const cnt = c => state.roster.filter(r => f.dress[r.id] === c.id).length;
+    body.innerHTML = `<div class="costs">${f.costumes.map((c, i) => `<button type="button" class="${c.id === finCost ? 'on' : ''}" style="--c:${c.color}" data-c="${c.id}">${circled(i + 1)} ${esc(c.name)}<small>${cnt(c)}人</small></button>`).join('') || '<p class="hint" style="margin:0">まだ衣装がありません。下で衣装を追加してください。</p>'}</div>
+      <div class="costedit">
+        <div class="row"><input type="text" id="cNew" placeholder="衣装の名前（例：ちょうちょ・おばあさん）"><button type="button" class="primary" id="cAdd">＋ 衣装を追加</button></div>
+        ${cur ? `<div class="row"><span style="font-size:13px">${circled(costumeNo(cur))} の名前</span><input type="text" id="cName" value="${esc(cur.name)}"><button type="button" id="cDel" style="color:var(--bad)">この衣装を消す</button></div>
+        <div class="swatches" aria-label="色">${COSTUME_COLORS.map(col => `<button type="button" data-col="${col}" class="${col === cur.color ? 'on' : ''}" style="background:${col}" aria-label="色"></button>`).join('')}</div>` : ''}
+      </div>`;
+    body.querySelectorAll('[data-c]').forEach(b => b.onclick = () => keepPlace('fnames', () => { finCost = b.dataset.c; renderFinBody(); renderFinNames(); }));
+    $('cAdd').onclick = () => {
+      const n = $('cNew').value.trim(); if (!n) { toast('衣装の名前を入れてください'); $('cNew').focus(); return; }
+      const used = f.costumes.map(c => c.color); const col = COSTUME_COLORS.find(x => !used.includes(x)) || COSTUME_COLORS[f.costumes.length % COSTUME_COLORS.length];
+      const c = { id: 'k' + uid(), name: n, color: col }; f.costumes.push(c); finCost = c.id; save(); renderFinBody(); renderFinNames(); renderPreview();
+    };
+    $('cNew').addEventListener('keydown', e => { if (e.key === 'Enter') $('cAdd').click(); });
+    if (cur) {
+      $('cName').addEventListener('input', e => { cur.name = e.target.value; save(); renderPreview(); body.querySelector(`[data-c="${cur.id}"]`).firstChild.textContent = `${circled(costumeNo(cur))} ${cur.name}`; });
+      $('cName').addEventListener('change', () => { renderFinBody(); renderFinNames(); });
+      body.querySelectorAll('[data-col]').forEach(b => b.onclick = () => { cur.color = b.dataset.col; save(); renderFinBody(); renderFinNames(); renderPreview(); });
+      $('cDel').onclick = () => confirmDlg(`「${cur.name}」を消しますか？`, `この衣装になっている${cnt(cur)}人は、衣装なしになります。`, '消す', () => {
+        f.costumes = f.costumes.filter(c => c.id !== cur.id); for (const k of Object.keys(f.dress)) if (f.dress[k] === cur.id) delete f.dress[k];
+        finCost = null; save(); renderFinale(); renderPreview();
+      });
+    }
+  }
+}
+function renderFinNames() {
+  const f = finale();
+  const cur = f.costumes.find(c => c.id === finCost);
+  if (finMode === 'line') $('finHow').innerHTML = `名前をタップすると <b style="color:#7048e8">${finRow + 1}列目</b> に入ります（もう一度タップで外れます）`;
+  else $('finHow').innerHTML = cur ? `名前をタップすると <b style="color:${cur.color}">${circled(costumeNo(cur))} ${esc(cur.name)}</b> の衣装になります（もう一度タップで外れます）` : '先に衣装を追加してください';
+  const isLeft = r => finMode === 'line' ? finRowOf(r.id) < 0 : !costumeOf(r.id);
+  const left = state.roster.filter(isLeft);
+  const shown = onlyLeft ? left : state.roster;
+  $('fnames').innerHTML = shown.map(r => {
+    const row = finRowOf(r.id), c = costumeOf(r.id);
+    const here = finMode === 'line' ? row === finRow : (c && c.id === finCost);
+    return `<button type="button" data-id="${r.id}" class="${c ? 'dress' : ''} ${here ? 'here' : ''}" style="--dc:${c ? c.color : '#ccc'};--c:${finMode === 'line' ? '#7048e8' : (cur ? cur.color : '#999')}">${c ? '<span class="dot"></span>' : ''}${esc(r.name)}<span class="tag" style="--c:#7048e8;${row < 0 ? 'background:#bbb' : ''}">${row < 0 ? 'まだ並んでいない' : (row + 1) + '列目'}${c ? '・' + circled(costumeNo(c)) : ''}</span></button>`;
+  }).join('') || '<div class="hint">全員、決まっています。</div>';
+  $('fnames').querySelectorAll('[data-id]').forEach(b => b.onclick = () => keepPlace('fnames', () => {
+    const id = b.dataset.id;
+    if (finMode === 'line') {
+      const was = finRowOf(id);
+      f.lines.forEach(l => { const i = l.indexOf(id); if (i >= 0) l.splice(i, 1); });
+      if (was !== finRow) f.lines[finRow].push(id);
+    } else {
+      if (!cur) { toast('先に衣装を追加してください'); return; }
+      if (f.dress[id] === cur.id) delete f.dress[id]; else f.dress[id] = cur.id;
+    }
+    save(); renderFinBody(); renderFinNames(); renderTabs(); renderPreview();
+  }));
+  $('finLeft').innerHTML = left.length
+    ? `<div class="left">${finMode === 'line' ? 'フィナーレでまだ並んでいない子' : '衣装が決まっていない子'}：${left.length}人（${esc(left.slice(0, 6).map(r => r.name).join('、'))}${left.length > 6 ? ' …' : ''}）</div>`
+    : `<div class="left ok">✓ ${finMode === 'line' ? 'クラス全員がフィナーレに並んでいます' : 'クラス全員の衣装が決まっています'}</div>`;
+}
+
+/* ---------- フィナーレのページ（A4横・ステージだけ） ---------- */
+function drawFinale(cv) {
+  const W = cv.width, mm = W / 297, ctx = cv.getContext('2d');
+  ctx.save(); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, cv.height);
+  const f = finale();
+  const ff = (px, w = 400) => `${w} ${px}px ${FONT}`;
+  const text = (str, x, y, size, opt = {}) => {
+    ctx.font = ff(size * mm, opt.w || 400); ctx.fillStyle = opt.c || '#111'; ctx.textAlign = opt.a || 'left';
+    if (opt.max) { let sz = size; while (ctx.measureText(str).width > opt.max * mm && sz > 1.8) { sz -= 0.2; ctx.font = ff(sz * mm, opt.w || 400); } }
+    ctx.fillText(str, x * mm, y * mm); return ctx.measureText(str).width / mm;
+  };
+  const rect = (x, y, w, h, fill, stroke, lw, r = 0) => {
+    ctx.beginPath(); if (r && ctx.roundRect) ctx.roundRect(x * mm, y * mm, w * mm, h * mm, r * mm); else ctx.rect(x * mm, y * mm, w * mm, h * mm);
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = (lw || 0.3) * mm; ctx.stroke(); }
+  };
+  const tint = (hex, a) => { const h = hex.replace('#', ''); const r = parseInt(h.substr(0, 2), 16), g = parseInt(h.substr(2, 2), 16), b = parseInt(h.substr(4, 2), 16); const m = v => Math.round(v * a + 255 * (1 - a)); return `rgb(${m(r)},${m(g)},${m(b)})`; };
+  const rows = f.lines.slice(0, f.rows).map(l => l.filter(id => nameOf(id)));
+  const total = rows.reduce((a, l) => a + l.length, 0);
+  // 見出し
+  const L = 12, R = 285;
+  const x = text(state.className || 'クラス名', L, 15, 7, { w: 700, max: 90 });
+  if (state.title) text(state.title, L + x + 5, 15, 5.5, { c: '#333', max: 120 });
+  rect(L, 19.5, 40, 11, '#111', null, 0, 2.5);
+  text('フィナーレ', L + 20, 27.4, 6.2, { w: 700, c: '#fff', a: 'center' });
+  text(`ステージ ${total}人（クラス ${state.roster.length}人）`, R, 27.4, 3.4, { a: 'right', c: '#555' });
+  // 衣装の見本（下）
+  const costs = f.costumes;
+  const noDress = rows.flat().filter(id => !costumeOf(id)).length;
+  const items = costs.map((c, i) => ({ c, label: `${circled(i + 1)} ${c.name}（${rows.flat().filter(id => f.dress[id] === c.id).length}人）` }));
+  if (noDress && costs.length) items.push({ c: null, label: `衣装なし（${noDress}人）` });
+  const perLine = 4, legH = items.length ? Math.ceil(items.length / perLine) * 8 + 4 : 0;
+  // ステージ
+  const X0 = 12, Y0 = 35, BW = 273, BH = 210 - Y0 - 10 - legH;
+  rect(X0, Y0, BW, BH, '#fcfbff', '#111', 0.6, 2);
+  text('ステージ', X0 + 3, Y0 + 6, 3.4, { c: '#666' });
+  const cx = X0 + BW / 2;
+  ctx.save(); ctx.setLineDash([2.2 * mm, 1.6 * mm]); ctx.strokeStyle = '#333'; ctx.lineWidth = 0.4 * mm;
+  ctx.beginPath(); ctx.moveTo(cx * mm, (Y0 + 9) * mm); ctx.lineTo(cx * mm, (Y0 + BH - 3) * mm); ctx.stroke(); ctx.restore();
+  text('中心', cx, Y0 + 7, 3.2, { a: 'center', w: 700, c: '#333' });
+  if (!total) text('（フィナーレに並ぶ子が、まだ選ばれていません）', cx, Y0 + BH / 2, 4, { a: 'center', c: '#c92a2a' });
+  // 子どものカード：中心線から左右均等。どの列も同じ間隔なので、列どうしの位置がそろう
+  const maxN = Math.max(1, ...rows.map(l => l.length));
+  const slot = Math.min(32, (BW - 8) / maxN);
+  const rowGap = (BH - 14) / Math.max(1, f.rows);
+  const cardW = slot * 0.86, cardH = Math.min(rowGap * 0.66, 16);
+  rows.forEach((l, ri) => {
+    const yc = Y0 + 11 + rowGap * (ri + 0.5);
+    l.forEach((id, j) => {
+      const xc = cx + (j - (l.length - 1) / 2) * slot;
+      const c = costumeOf(id), nm = shortName(id);
+      rect(xc - cardW / 2, yc - cardH / 2, cardW, cardH, c ? tint(c.color, 0.32) : '#fff', c ? c.color : '#adb5bd', c ? 0.7 : 0.35, 1.6);
+      if (c) {   // 衣装の番号（白黒で印刷しても分かるように）。カードの左上の角に、半分はみ出して付ける
+        const r = Math.min(2.7, cardH * 0.18), bx = xc - cardW / 2 + r * 0.5, by = yc - cardH / 2 - r * 0.15;
+        ctx.beginPath(); ctx.arc(bx * mm, by * mm, r * mm, 0, Math.PI * 2); ctx.fillStyle = c.color; ctx.fill();
+        ctx.lineWidth = 0.4 * mm; ctx.strokeStyle = '#fff'; ctx.stroke();
+        text(String(costumeNo(c)), bx, by + r * 0.42, r * 1.25, { a: 'center', w: 700, c: '#fff' });
+      }
+      const fsN = Math.min(cardH * 0.4, 6);
+      if (nm.sur) text(nm.sur, xc, yc - cardH * 0.16, fsN * 0.55, { a: 'center', c: '#444', max: cardW - 2 });
+      text(nm.given, xc, yc + (nm.sur ? cardH * 0.24 : fsN * 0.36), fsN, { a: 'center', w: 700, max: cardW - (c ? 3 : 1.5) });
+    });
+  });
+  // 衣装の見本
+  if (items.length) {
+    const ly = Y0 + BH + 7, colW = BW / perLine;
+    items.forEach((it, i) => {
+      const lx = X0 + (i % perLine) * colW, y = ly + Math.floor(i / perLine) * 8;
+      rect(lx, y - 4.2, 8, 5.4, it.c ? tint(it.c.color, 0.32) : '#fff', it.c ? it.c.color : '#adb5bd', 0.6, 1.2);
+      text(it.label, lx + 10, y, 4, { w: 500, max: colW - 12 });
+    });
+  }
+  text('カードの色と番号は衣装。中心線から左右均等に並んでいます。同じ名前の子は、上に小さく姓を書いています。', X0, 207, 2.7, { c: '#555', max: BW - 25 });
+  ctx.restore();
+}
+
 function copyPrev() {
   const k = state.cur; if (k <= 1) { toast('場面1には前の場面がありません'); return; }
   const doIt = () => { const p = scene(k - 1); state.scenes[k] = Object.fromEntries(positions().map(x => [x.key, [...p[x.key]]])); state.gaps[k] = { ...gapOf(k - 1) }; save(); renderScene(); toast(`場面${k - 1}と同じ並びにしました。ここから入れ替えてください`); };
@@ -590,11 +826,18 @@ function copyPrev() {
   else doIt();
 }
 function renderPreview() {
-  const N = state.sceneCount;
+  const N = state.sceneCount, cv = $('pv');
+  if (state.onFinale) {
+    if (cv.width !== 1188) { cv.width = 1188; cv.height = 840; }   // フィナーレは横向き
+    $('pvLabel').textContent = 'フィナーレ';
+    $('pvPrev').disabled = false; $('pvNext').disabled = true;
+    drawFinale(cv); return;
+  }
+  if (cv.width !== 840) { cv.width = 840; cv.height = 1188; }
   const k = Math.min(Math.max(1, state.cur), N);
   $('pvLabel').textContent = `場面${k} ／ 全${N}場面`;
-  $('pvPrev').disabled = k <= 1; $('pvNext').disabled = k >= N;
-  drawPage($('pv'), k);
+  $('pvPrev').disabled = k <= 1; $('pvNext').disabled = false;
+  drawPage(cv, k);
 }
 
 /* ============================================================
@@ -614,13 +857,19 @@ async function makePdf() {
     pdf.addImage(cv.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
     await new Promise(r => setTimeout(r, 0));
   }
+  // 最後にフィナーレ（A4横）
+  pdf.addPage('a4', 'landscape');
+  const cvF = document.createElement('canvas'); cvF.width = 2339; cvF.height = 1654;
+  drawFinale(cvF);
+  pdf.addImage(cvF.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 297, 210, undefined, 'FAST');
+  if (!finPlaced()) toast('フィナーレに並ぶ子がまだ選ばれていません', 3500);
   const name = `立ち位置_${state.className || 'クラス'}${state.title ? '_' + state.title : ''}.pdf`.replace(/[\\/:*?"<>|]/g, '');
   const blob = pdf.output('blob');
   const url = URL.createObjectURL(blob);
   const file = new File([blob], name, { type: 'application/pdf' });
   const canShare = navigator.canShare && navigator.canShare({ files: [file] });
   openDlg(`<div class="dlg"><h3>PDFができました</h3>
-    <p style="margin:0">${esc(name)}（${state.sceneCount}ページ）</p>
+    <p style="margin:0">${esc(name)}（${state.sceneCount + 1}ページ：場面${state.sceneCount}ページ＋フィナーレ）</p>
     <div class="list">
       ${canShare ? '<button type="button" id="pdShare">📤 保存・共有・印刷する<small>「ファイルに保存」や「プリント」を選べます</small></button>' : ''}
       <button type="button" id="pdOpen">📄 PDFを開く</button>
@@ -696,8 +945,17 @@ $('scMinus').onclick = () => {
   else setCount(n);
 };
 $('scPlus').onclick = () => { if (state.sceneCount >= MAX_SCENES) { toast(`場面は${MAX_SCENES}までです`); return; } setCount(state.sceneCount + 1); };
-$('pvPrev').onclick = () => { if (state.cur > 1) { state.cur--; save(); state.roster.length ? renderScene() : renderPreview(); } };
-$('pvNext').onclick = () => { if (state.cur < state.sceneCount) { state.cur++; save(); state.roster.length ? renderScene() : renderPreview(); } };
+$('pvPrev').onclick = () => {
+  if (state.onFinale) { state.onFinale = false; state.cur = state.sceneCount; }
+  else if (state.cur > 1) state.cur--;
+  else return;
+  save(); state.roster.length ? renderScene() : renderPreview();
+};
+$('pvNext').onclick = () => {
+  if (state.onFinale) return;
+  if (state.cur < state.sceneCount) state.cur++; else state.onFinale = true;   // 最後の場面の次はフィナーレ
+  save(); state.roster.length ? renderScene() : renderPreview();
+};
 $('btnPdf').onclick = makePdf;
 $('btnMore').onclick = dataMenu;
 
