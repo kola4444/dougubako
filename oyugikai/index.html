@@ -676,7 +676,7 @@ function renderFinBody() {
       <div class="panel" id="fpanel" style="--c:#7048e8"></div>`;
     body.querySelectorAll('[data-r]').forEach(b => b.onclick = () => keepPlace('fnames', () => { finRow = +b.dataset.r; renderFinBody(); renderFinNames(); }));
     const ids = f.lines[finRow].filter(id => nameOf(id));
-    $('fpanel').innerHTML = `<div class="ph">${finRow + 1}列目（${ids.length}人）<small>${finRow === 0 ? 'PDFでいちばん上の列' : finRow === f.rows - 1 ? 'PDFでいちばん下の列' : ''}</small></div>
+    $('fpanel').innerHTML = `<div class="ph">${finRow + 1}列目（${ids.length}人）<small>${finRow === 0 ? 'いちばん前（観客席側）の列' : finRow === f.rows - 1 ? 'いちばん後ろの列' : '前から' + (finRow + 1) + '番目の列'}</small></div>
       ${ids.length ? '<div class="howto">上から順に、PDFでは左から右へ並びます。中心線から左右均等に配置されます。≡ を長押ししてつまむと順番を変えられます。</div>' : ''}
       <ol id="flist">${ids.map((id, i) => { const c = costumeOf(id); return `<li data-id="${id}"><span class="grip" aria-hidden="true">≡</span><span class="no">${i + 1}</span><span class="nm">${c ? `<span class="dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${c.color};margin-right:4px"></span>` : ''}${esc(nameOf(id))}</span><button type="button" data-rm="${id}" aria-label="外す">✕</button></li>`; }).join('')}</ol>
       ${ids.length ? '' : '<div class="emptyl">まだ誰も並んでいません。下の名簿から名前をタップしてください。</div>'}`;
@@ -776,9 +776,13 @@ function drawFinale(cv) {
   if (noDress && costs.length) items.push({ c: null, label: `衣装なし（${noDress}人）` });
   const perLine = 4, legH = items.length ? Math.ceil(items.length / perLine) * 8 + 4 : 0;
   // ステージ
-  const X0 = 12, Y0 = 35, BW = 273, BH = 210 - Y0 - 10 - legH;
+  const AUD = 9;   // 観客席の帯の高さ
+  const X0 = 12, Y0 = 35, BW = 273, BH = 210 - Y0 - 10 - legH - AUD;
   rect(X0, Y0, BW, BH, '#fcfbff', '#111', 0.6, 2);
   text('ステージ', X0 + 3, Y0 + 6, 3.4, { c: '#666' });
+  // 観客席（ステージの下）
+  rect(X0 + BW * 0.15, Y0 + BH + 1.6, BW * 0.7, AUD - 3, '#f1f3f5', null, 0, 1.5);
+  text('▼ 観客席 ▼', X0 + BW / 2, Y0 + BH + 1.6 + (AUD - 3) / 2 + 1.5, 4.2, { a: 'center', w: 700, c: '#495057' });
   const cx = X0 + BW / 2;
   ctx.save(); ctx.setLineDash([2.2 * mm, 1.6 * mm]); ctx.strokeStyle = '#333'; ctx.lineWidth = 0.4 * mm;
   ctx.beginPath(); ctx.moveTo(cx * mm, (Y0 + 9) * mm); ctx.lineTo(cx * mm, (Y0 + BH - 3) * mm); ctx.stroke(); ctx.restore();
@@ -790,7 +794,8 @@ function drawFinale(cv) {
   const rowGap = (BH - 14) / Math.max(1, f.rows);
   const cardW = slot * 0.86, cardH = Math.min(rowGap * 0.66, 16);
   rows.forEach((l, ri) => {
-    const yc = Y0 + 11 + rowGap * (ri + 0.5);
+    const yc = Y0 + BH - 3 - rowGap * (ri + 0.5);   // 1列目がいちばん下（観客席側）
+    text(`${ri + 1}列目`, X0 - 1.2, yc + 1.1, 2.9, { w: 700, c: '#495057', a: 'right', max: 10.5 });   // 列の番号は枠の外（左）に
     l.forEach((id, j) => {
       const xc = cx + (j - (l.length - 1) / 2) * slot;
       const c = costumeOf(id), nm = shortName(id);
@@ -808,14 +813,14 @@ function drawFinale(cv) {
   });
   // 衣装の見本
   if (items.length) {
-    const ly = Y0 + BH + 7, colW = BW / perLine;
+    const ly = Y0 + BH + AUD + 6, colW = BW / perLine;
     items.forEach((it, i) => {
       const lx = X0 + (i % perLine) * colW, y = ly + Math.floor(i / perLine) * 8;
       rect(lx, y - 4.2, 8, 5.4, it.c ? tint(it.c.color, 0.32) : '#fff', it.c ? it.c.color : '#adb5bd', 0.6, 1.2);
       text(it.label, lx + 10, y, 4, { w: 500, max: colW - 12 });
     });
   }
-  text('カードの色と番号は衣装。中心線から左右均等に並んでいます。同じ名前の子は、上に小さく姓を書いています。', X0, 207, 2.7, { c: '#555', max: BW - 25 });
+  text('1列目がいちばん前（観客席側）。カードの色と番号は衣装。中心線から左右均等に並んでいます。同じ名前の子は、上に小さく姓を書いています。', X0, 207, 2.7, { c: '#555', max: BW - 25 });
   ctx.restore();
 }
 
