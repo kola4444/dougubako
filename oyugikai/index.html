@@ -420,16 +420,19 @@ function drawPage(cv, k) {
   const stTop = Y0 + 16, stBot = Y0 + BH - 4;
   rect(ST.x, stTop, ST.w, stBot - stTop, '#fbfaff', '#111', 0.5);
 
-  // ---- 後ろの待機列（待機2・待機3…）：元の図と同じく2列。壁のすぐ後ろの列に前半、その後ろの列に後半 ----
+  // ---- 後ろの待機列（待機2・待機3…）：3列。壁のすぐ後ろの列から順に、待機の番号の小さい方から等分して入れる ----
+  //      例：待機2〜7 → 1列目（壁のすぐ後ろ）に2・3、2列目に4・5、3列目に6・7。割り切れないときは壁に近い列から1つ多く
   //      それぞれの列の中では、待機の番号の順に上から並ぶ（上が先頭）
   const back = P.filter(p => /^w\d+$/.test(p.key) && p.key !== 'w1');
-  const half = Math.ceil(back.length / 2);
+  const nBack = Math.min(3, back.length);
   const areaL = X0 + 1.5, areaR = WALL - 2, areaT = Y0 + 16, areaB = Y0 + BH - 3;
-  const colW = (areaR - areaL) / 2;
-  const backCols = [
-    { x: areaL + colW + 0.6, w: colW - 1.2, groups: back.slice(0, half) },   // 壁のすぐ後ろ
-    { x: areaL + 0.6, w: colW - 1.2, groups: back.slice(half) },             // その後ろ
-  ].filter(c => c.groups.length);
+  const colW = (areaR - areaL) / Math.max(2, nBack);
+  const backCols = [];
+  for (let c = 0, from = 0; c < nBack; c++) {
+    const cnt = Math.floor(back.length / nBack) + (c < back.length % nBack ? 1 : 0);
+    backCols.push({ x: areaR - colW * (c + 1) + 0.6, w: colW - 1.2, groups: back.slice(from, from + cnt) });   // c=0 が壁のすぐ後ろ
+    from += cnt;
+  }
 
   // ---- 文字の大きさ：7文字の名前がちょうど入る大きさを上限にする（それより長い名前は、その子だけ小さくする） ----
   const fitChars = (w, n = 7) => { ctx.font = f(10 * mm, 500); return 10 * (w * mm) / ctx.measureText('あ'.repeat(n)).width; };
@@ -516,7 +519,7 @@ function drawPage(cv, k) {
   } else {
     text('（まだ選ばれていません）', ST.x + ST.w / 2, stTop + 24, 3.4, { a: 'center', c: '#c92a2a' });
   }
-  text('後ろの待機列：壁のすぐ後ろの列に前半、その後ろの列に後半が並ぶ（上が先頭）。音響待機1は下が先頭。番号は列の先頭からの順番。', X0, Y0 + BH + 5.5, 2.7, { c: '#555', max: BW - 25 });
+  text('後ろの待機列：壁のすぐ後ろの列から順に、待機の番号の小さい方が並ぶ（上が先頭）。音響待機1は下が先頭。番号は列の先頭からの順番。', X0, Y0 + BH + 5.5, 2.7, { c: '#555', max: BW - 25 });
   text(`${k} / ${N}`, X0 + BW, Y0 + BH + 5.5, 3.2, { a: 'right', c: '#555' });
   ctx.restore();
 }
