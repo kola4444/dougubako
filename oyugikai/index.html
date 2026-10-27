@@ -9,13 +9,14 @@
 <meta name="apple-mobile-web-app-title" content="立ち位置">
 <meta name="theme-color" content="#2b2140">
 <title>お遊戯会 立ち位置</title>
-<link rel="manifest" href="../manifest.webmanifest">
-<link rel="stylesheet" href="../fonts/fonts.css">
+<!-- 先生に配る「配布版」。どうぐばこの開発の影響を受けないよう、部品・オフライン対応はこのフォルダの中だけで完結させている -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
 <!-- 名簿の読み込み（SheetJS）と PDF 作成（jsPDF）は、どうぐばこのサイトに置いたものを使う -->
-<script src="../vendor/sheetjs/xlsx.full.min.js"></script>
-<script src="../vendor/jspdf/jspdf.umd.min.js"></script>
-<script src="../vendor/sortable/Sortable.min.js"></script>
-<script defer src="../common/license.js"></script>
+<script src="lib/sheetjs/xlsx.full.min.js"></script>
+<script src="lib/jspdf/jspdf.umd.min.js"></script>
+<script src="lib/sortable/Sortable.min.js"></script>
 <style>
 :root{
   --bg:#f5f3fa; --panel:#fff; --ink:#22202a; --muted:#6b6878; --line:#e3dfee; --accent:#5f3dc4; --accent-soft:#efeafd;
@@ -147,7 +148,6 @@ dialog::backdrop{background:rgba(0,0,0,.4)}
 </head>
 <body>
 <header>
-  <a id="btnBox" class="boxlink" href="../">← どうぐばこ</a>
   <h1>🎭 お遊戯会 立ち位置</h1>
   <button id="btnMore" type="button">⋯ データ</button>
   <button id="btnPdf" class="primary" type="button">PDFを作成</button>
@@ -203,7 +203,7 @@ dialog::backdrop{background:rgba(0,0,0,.4)}
 /* ============================================================
    基本設定・保存（データはこの端末の中だけ）
    ============================================================ */
-const NS = 'dougubako.oyugikai.';
+const NS = 'tachiichi.';   // 配布版は、どうぐばこの開発版とは別の保存場所を使う
 const LS_CUR = NS + 'current.v2';
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -970,10 +970,9 @@ $('btnMore').onclick = dataMenu;
 /* ---------- 起動 ---------- */
 renderAll();
 if (document.fonts) document.fonts.ready.then(renderPreview);
-document.addEventListener('DOMContentLoaded', () => { if (window.DouguLicense) window.DouguLicense.guardApp('oyugikai', '../'); });
-// オフライン対応：どうぐばこ共通の仕組み（sw.js）に登録。保存したデータが自動で消されにくくする
+// オフライン対応：このフォルダの sw.js に登録（どうぐばことは別）。保存したデータが自動で消されにくくする
 if (/^https?:$/.test(location.protocol)) {
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(() => {});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 }
 </script>
