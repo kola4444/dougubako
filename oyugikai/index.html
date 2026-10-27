@@ -9,14 +9,13 @@
 <meta name="apple-mobile-web-app-title" content="立ち位置">
 <meta name="theme-color" content="#2b2140">
 <title>お遊戯会 立ち位置</title>
-<!-- 先生に配る「配布版」。どうぐばこの開発の影響を受けないよう、部品・オフライン対応はこのフォルダの中だけで完結させている -->
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="icon.png">
-<link rel="icon" href="icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="stylesheet" href="../fonts/fonts.css">
 <!-- 名簿の読み込み（SheetJS）と PDF 作成（jsPDF）は、どうぐばこのサイトに置いたものを使う -->
-<script src="lib/sheetjs/xlsx.full.min.js"></script>
-<script src="lib/jspdf/jspdf.umd.min.js"></script>
-<script src="lib/sortable/Sortable.min.js"></script>
+<script src="../vendor/sheetjs/xlsx.full.min.js"></script>
+<script src="../vendor/jspdf/jspdf.umd.min.js"></script>
+<script src="../vendor/sortable/Sortable.min.js"></script>
+<script defer src="../common/license.js"></script>
 <style>
 :root{
   --bg:#f5f3fa; --panel:#fff; --ink:#22202a; --muted:#6b6878; --line:#e3dfee; --accent:#5f3dc4; --accent-soft:#efeafd;
@@ -98,6 +97,13 @@ details.scnames summary{cursor:pointer;color:var(--accent);font-size:14px;margin
 .gapbox input[type=checkbox]{width:22px;height:22px;flex:none;margin-top:1px}
 .gapbox textarea{width:100%;margin-top:8px;font:inherit;font-size:16px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;min-height:64px;resize:vertical;background:#fff}
 .gapbox .gnote{font-size:12px;color:var(--muted);margin-top:4px}
+.splitbox{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:0 0 10px;background:#fff}
+.splitbox .st{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;font-weight:700}
+.splitbox .sr{display:grid;grid-template-columns:7.5em auto minmax(0,1fr);gap:10px;align-items:center;margin-top:6px;font-size:14px}
+.splitbox .stepper b{min-width:32px;font-size:18px}
+.splitbox .stepper button{width:40px;height:36px;font-size:20px}
+.splitbox .sg{font-size:13px;color:var(--muted)}
+.splitbox .sr small{display:block;font-weight:400}
 /* フィナーレ */
 .tabs button.fin{border-color:#e8590c;color:#e8590c;font-weight:700}
 .tabs button.fin.on{background:#e8590c;border-color:#e8590c;color:#fff}
@@ -148,6 +154,7 @@ dialog::backdrop{background:rgba(0,0,0,.4)}
 </head>
 <body>
 <header>
+  <a id="btnBox" class="boxlink" href="../">← どうぐばこ</a>
   <h1>🎭 お遊戯会 立ち位置</h1>
   <button id="btnMore" type="button">⋯ データ</button>
   <button id="btnPdf" class="primary" type="button">PDFを作成</button>
@@ -203,7 +210,7 @@ dialog::backdrop{background:rgba(0,0,0,.4)}
 /* ============================================================
    基本設定・保存（データはこの端末の中だけ）
    ============================================================ */
-const NS = 'tachiichi.';   // 配布版は、どうぐばこの開発版とは別の保存場所を使う
+const NS = 'dougubako.oyugikai.';
 const LS_CUR = NS + 'current.v2';
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -218,7 +225,7 @@ function positions(N = state.sceneCount) {
   return out;
 }
 const posInfo = key => positions(MAX_SCENES).find(p => p.key === key);
-function blank() { return { version: 2, className: '', title: '', sceneCount: 5, sceneNames: [], roster: [], scenes: {}, gaps: {}, cur: 1 }; }
+function blank() { return { version: 2, className: '', title: '', sceneCount: 5, sceneNames: [], roster: [], scenes: {}, gaps: {}, backSplit: {}, cur: 1 }; }
 let state;
 try { state = JSON.parse(localStorage.getItem(LS_CUR)) || blank(); } catch (e) { state = blank(); }
 state = { ...blank(), ...state };
@@ -270,6 +277,15 @@ function shortName(id) {
   const dup = state.roster.filter(r => { const q = r.name.trim().split(/[\s　]+/); return (q.length > 1 ? q.slice(1).join(' ') : r.name.trim()) === given; }).length > 1;
   return { given, sur: dup ? sur : '' };
 }
+// PDFの後ろの待機列（待機2〜）：3列それぞれに入れる待機の数。決めていない（または場面の数が変わって合わない）ときは3等分
+function backSplitOf(k, n = Math.max(0, state.sceneCount - 2)) {
+  const a = (state.backSplit || {})[k];
+  if (Array.isArray(a) && a.length === 3 && a.every(v => Number.isInteger(v) && v >= 0) && a[0] + a[1] + a[2] === n) return [...a];
+  const m = Math.min(3, n), out = [0, 0, 0];
+  for (let c = 0; c < m; c++) out[c] = Math.floor(n / m) + (c < n % m ? 1 : 0);
+  return out;
+}
+const backSplitSet = k => { const a = (state.backSplit || {})[k]; return !!a && backSplitOf(k).every((v, i) => v === a[i]); };
 function gapOf(k) { if (!state.gaps) state.gaps = {}; return state.gaps[k] || (state.gaps[k] = { on: false, text: '' }); }
 const nameOf = id => (state.roster.find(r => r.id === id) || {}).name || '';
 const placedCount = k => { const s = scene(k); return positions().reduce((a, p) => a + s[p.key].filter(id => nameOf(id)).length, 0); };
@@ -420,18 +436,18 @@ function drawPage(cv, k) {
   const stTop = Y0 + 16, stBot = Y0 + BH - 4;
   rect(ST.x, stTop, ST.w, stBot - stTop, '#fbfaff', '#111', 0.5);
 
-  // ---- 後ろの待機列（待機2・待機3…）：3列。壁のすぐ後ろの列から順に、待機の番号の小さい方から等分して入れる ----
-  //      例：待機2〜7 → 1列目（壁のすぐ後ろ）に2・3、2列目に4・5、3列目に6・7。割り切れないときは壁に近い列から1つ多く
+  // ---- 後ろの待機列（待機2・待機3…）：3列。壁のすぐ後ろの列から順に、待機の番号の小さい方から入れる ----
+  //      それぞれの列に入れる数は場面ごとに決められる（決めていなければ3等分。例：待機2〜7 → 2・3／4・5／6・7）
   //      それぞれの列の中では、待機の番号の順に上から並ぶ（上が先頭）
   const back = P.filter(p => /^w\d+$/.test(p.key) && p.key !== 'w1');
-  const nBack = Math.min(3, back.length);
+  const split = backSplitOf(k, back.length);
+  const nSlot = Math.max(2, Math.min(3, back.length), split[2] ? 3 : split[1] ? 2 : 1);
   const areaL = X0 + 1.5, areaR = WALL - 2, areaT = Y0 + 16, areaB = Y0 + BH - 3;
-  const colW = (areaR - areaL) / Math.max(2, nBack);
+  const colW = (areaR - areaL) / nSlot;
   const backCols = [];
-  for (let c = 0, from = 0; c < nBack; c++) {
-    const cnt = Math.floor(back.length / nBack) + (c < back.length % nBack ? 1 : 0);
-    backCols.push({ x: areaR - colW * (c + 1) + 0.6, w: colW - 1.2, groups: back.slice(from, from + cnt) });   // c=0 が壁のすぐ後ろ
-    from += cnt;
+  for (let c = 0, from = 0; c < 3; c++) {
+    if (split[c]) backCols.push({ x: areaR - colW * (c + 1) + 0.6, w: colW - 1.2, groups: back.slice(from, from + split[c]) });   // c=0 が壁のすぐ後ろ
+    from += split[c];
   }
 
   // ---- 文字の大きさ：7文字の名前がちょうど入る大きさを上限にする（それより長い名前は、その子だけ小さくする） ----
@@ -550,6 +566,7 @@ function renderEditor() {
       <button type="button" id="tClear">この場面を空にする</button>
     </div>
     <div class="gapbox" id="gapBox"></div>
+    <div class="splitbox" id="splitBox"></div>
     <div class="posbar" id="posbar"></div>
     <div class="panel" id="panel"></div>
     <div class="picker">
@@ -578,7 +595,7 @@ function renderScene() {
   const fin = !!state.onFinale;
   $('sceneEd').hidden = fin; $('finaleEd').hidden = !fin;
   if (fin) { renderTabs(); renderFinale(); renderPreview(); return; }
-  renderTabs(); renderGap(); renderBoxes(); renderNames(); renderPreview();
+  renderTabs(); renderGap(); renderSplit(); renderBoxes(); renderNames(); renderPreview();
 }
 function renderGap() {
   const box = $('gapBox'); if (!box) return;
@@ -587,6 +604,28 @@ function renderGap() {
     ${g.on ? `<textarea id="gapText" placeholder="自由に書けます（例：うさぎ役の3人がここに戻る）">${esc(g.text)}</textarea><div class="gnote">PDFでは、音響待機1の先頭の前（ステージ側）に点線の枠で入り、音響待機1の子はその分だけ上にずれます。</div>` : ''}`;
   $('gapOn').onchange = e => keepPlace('gapBox', () => { g.on = e.target.checked; save(); renderGap(); renderTabs(); renderPreview(); });
   $('gapText')?.addEventListener('input', e => { g.text = e.target.value; save(); renderPreview(); });
+}
+function renderSplit() {
+  const box = $('splitBox'); if (!box) return;
+  const n = Math.max(0, state.sceneCount - 2);
+  box.hidden = n < 2; if (n < 2) return;
+  const a = backSplitOf(state.cur), custom = backSplitSet(state.cur);
+  const names = c => { const from = a.slice(0, c).reduce((x, y) => x + y, 0); return Array.from({ length: a[c] }, (_, i) => '待機' + (from + i + 2)).join('・') || '（なし）'; };
+  const where = ['壁のすぐ後ろ', 'まん中', 'いちばん後ろ'];
+  box.innerHTML = `<div class="st"><span>PDFの待機2〜の並べ方（壁の後ろの3列）</span>${custom ? '<button type="button" id="splitReset">3等分に戻す</button>' : '<span class="sg">今は3等分</span>'}</div>
+    ${[0, 1, 2].map(c => `<div class="sr"><span>${c + 1}列目<small class="sg">（${where[c]}）</small></span>
+      <div class="stepper"><button type="button" data-c="${c}" data-d="-1" aria-label="${c + 1}列目を減らす" ${a[c] ? '' : 'disabled'}>−</button><b>${a[c]}</b><button type="button" data-c="${c}" data-d="1" aria-label="${c + 1}列目を増やす" ${a[c] === n ? 'disabled' : ''}>＋</button></div>
+      <span class="sg">${names(c)}</span></div>`).join('')}
+    <div class="gnote">待機の番号の小さい方から、1列目→2列目→3列目の順に入ります。それぞれの列の中は、上が先頭です。</div>`;
+  const put = b => keepPlace('splitBox', () => { if (!state.backSplit) state.backSplit = {}; if (b) state.backSplit[state.cur] = b; else delete state.backSplit[state.cur]; save(); renderSplit(); renderPreview(); });
+  box.querySelectorAll('[data-c]').forEach(btn => btn.onclick = () => {
+    const c = +btn.dataset.c, d = +btn.dataset.d, b = [...a];
+    // 増やす：うしろの列（なければ前の列）から1つもらう。減らす：うしろの列（3列目なら前の列）へ1つ渡す
+    const other = d > 0 ? [2, 1, 0].filter(i => i !== c && b[i] > 0).sort((x, y) => (y > c) - (x > c))[0] : (c < 2 ? c + 1 : 1);
+    if (other == null || b[c] + d < 0) return;
+    b[c] += d; b[other] -= d; put(b);
+  });
+  $('splitReset')?.addEventListener('click', () => put(null));
 }
 function renderTabs() {
   const t = $('tabs'); if (!t) return;
@@ -829,7 +868,7 @@ function drawFinale(cv) {
 
 function copyPrev() {
   const k = state.cur; if (k <= 1) { toast('場面1には前の場面がありません'); return; }
-  const doIt = () => { const p = scene(k - 1); state.scenes[k] = Object.fromEntries(positions().map(x => [x.key, [...p[x.key]]])); state.gaps[k] = { ...gapOf(k - 1) }; save(); renderScene(); toast(`場面${k - 1}と同じ並びにしました。ここから入れ替えてください`); };
+  const doIt = () => { const p = scene(k - 1); state.scenes[k] = Object.fromEntries(positions().map(x => [x.key, [...p[x.key]]])); state.gaps[k] = { ...gapOf(k - 1) }; if (!state.backSplit) state.backSplit = {}; if (backSplitSet(k - 1)) state.backSplit[k] = backSplitOf(k - 1); else delete state.backSplit[k]; save(); renderScene(); toast(`場面${k - 1}と同じ並びにしました。ここから入れ替えてください`); };
   if (placedCount(k)) confirmDlg(`場面${k}を、場面${k - 1}と同じ並びにしますか？`, `場面${k}で入れた内容は、場面${k - 1}の並びで置きかわります。`, '同じにする', doIt);
   else doIt();
 }
@@ -970,9 +1009,10 @@ $('btnMore').onclick = dataMenu;
 /* ---------- 起動 ---------- */
 renderAll();
 if (document.fonts) document.fonts.ready.then(renderPreview);
-// オフライン対応：このフォルダの sw.js に登録（どうぐばことは別）。保存したデータが自動で消されにくくする
+document.addEventListener('DOMContentLoaded', () => { if (window.DouguLicense) window.DouguLicense.guardApp('oyugikai', '../'); });
+// オフライン対応：どうぐばこ共通の仕組み（sw.js）に登録。保存したデータが自動で消されにくくする
 if (/^https?:$/.test(location.protocol)) {
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(() => {});
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 }
 </script>
